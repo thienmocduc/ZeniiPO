@@ -78,7 +78,15 @@
       "Bash(curl -s 'https://api.vercel.com/v6/deployments?projectId=prj_pRvc5dkmXtaoDlxErf6XGsHSJZD8&teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&limit=3&target=production' -H 'Authorization: Bearer __TRACKED_VAR__')",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);j.deployments.forEach\\(dep=>console.log\\(dep.uid,'|',new Date\\(dep.createdAt\\).toISOString\\(\\).substring\\(0,19\\),'|',dep.state,'|',dep.meta?.githubCommitSha?.substring\\(0,7\\)\\)\\)}\\)\")",
       "Bash(curl -s \"https://zeniipo.vercel.app/api/dashboard\" -w \"\\\\n%{http_code}\\\\n\")",
-      "Bash(curl -s \"https://zeniipo.vercel.app/api/journeys\" -w \"\\\\n%{http_code}\\\\n\")"
+      "Bash(curl -s \"https://zeniipo.vercel.app/api/journeys\" -w \"\\\\n%{http_code}\\\\n\")",
+      "Bash(curl -s \"https://zeniipo.vercel.app/api/journeys/x\" -w \"\\\\n%{http_code}\\\\n\")",
+      "Bash(curl -s \"https://zeniipo.vercel.app/api/okrs\" -w \"\\\\n%{http_code}\\\\n\")",
+      "Bash(curl -s \"https://zeniipo.vercel.app/api/rounds\" -w \"\\\\n%{http_code}\\\\n\")",
+      "Bash(curl -s 'https://api.vercel.com/v6/deployments?projectId=prj_pRvc5dkmXtaoDlxErf6XGsHSJZD8&teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&limit=1&target=production&state=READY' -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(curl -s 'https://api.vercel.com/v6/deployments?projectId=prj_pRvc5dkmXtaoDlxErf6XGsHSJZD8&teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&limit=5' -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\(JSON.stringify\\(j?.aliases?.[0]?.deploymentId||j,null,2\\).substring\\(0,200\\)\\)}\\)\")",
+      "Bash(curl -s 'https://api.vercel.com/v3/deployments/dpl_Fnsc4WucZfdNQmQnjg2tMpD1yXry/events?teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&builds=1&limit=100' -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(curl -s 'https://api.vercel.com/v3/deployments/dpl_Fnsc4WucZfdNQmQnjg2tMpD1yXry/events?teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&builds=1&limit=200' -H 'Authorization: Bearer __TRACKED_VAR__')"
     ]
   }
 }

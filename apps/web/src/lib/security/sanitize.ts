@@ -34,9 +34,10 @@ const ALLOWED_ATTR = ['href', 'target', 'rel']
  */
 export function sanitizeHtml(dirty: string): string {
   // Lazy import — only load DOMPurify when actually called.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const DOMPurify = require('isomorphic-dompurify') as { sanitize: typeof import('isomorphic-dompurify').sanitize }
-  return DOMPurify.sanitize(dirty, {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+  const purify: any = require('isomorphic-dompurify')
+  const sanitize = purify.sanitize || purify.default?.sanitize
+  return sanitize(dirty, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     KEEP_CONTENT: true,
