@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
 
   try {
     switch (event.type) {

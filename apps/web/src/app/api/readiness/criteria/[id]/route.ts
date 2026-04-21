@@ -12,8 +12,9 @@ const UpdateSchema = z.object({
   evidence_note: safeString.optional(),
 })
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const idCheck = safeUuid.safeParse(params.id)
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const idCheck = safeUuid.safeParse(id)
   if (!idCheck.success) {
     return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
   }
@@ -24,7 +25,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -33,7 +34,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { data, error } = await supabase
     .from('ipo_readiness_criteria')
     .update(parsed.data)
-    .eq('id', params.id)
+    .eq('id', id)
     .select()
     .single()
 

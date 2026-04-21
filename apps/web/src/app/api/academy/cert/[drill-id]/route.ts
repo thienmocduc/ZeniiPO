@@ -7,15 +7,15 @@ export const runtime = 'nodejs'
 
 export async function POST(
   _req: Request,
-  { params }: { params: { 'drill-id': string } },
+  { params }: { params: Promise<{ 'drill-id': string }> },
 ) {
-  const drillId = params['drill-id']
+  const { 'drill-id': drillId } = await params
   const idCheck = safeUuid.safeParse(drillId)
   if (!idCheck.success) {
     return NextResponse.json({ error: 'Invalid drill id' }, { status: 400 })
   }
 
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

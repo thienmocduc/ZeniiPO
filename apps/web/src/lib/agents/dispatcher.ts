@@ -57,7 +57,7 @@ function buildUserPrompt(input: AgentRunInput): string {
 async function loadAgentFromCatalog(
   agentCode: string,
 ): Promise<AgentCatalogRow> {
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const { data, error } = await supabase
     .from('agent_catalog')
     .select(
@@ -126,7 +126,7 @@ export async function resolveTenantAgentId(
   tenantId: string,
   agentCode: string,
 ): Promise<string> {
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
 
   // Try existing row first.
   const existing = await supabase

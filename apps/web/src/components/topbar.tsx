@@ -51,9 +51,10 @@ function resolveSection(pathname: string) {
   return SECTION_LABELS[first] ?? 'Dashboard';
 }
 
-export function Topbar({ user }: { user: TopbarUser }) {
+export async function Topbar({ user }: { user: TopbarUser }) {
   // Read current pathname from Next.js request headers (set by middleware).
-  const h = headers();
+  // Next 15: headers() is async.
+  const h = await headers();
   const pathname =
     h.get('x-pathname') || h.get('x-invoke-path') || h.get('next-url') || '/dashboard';
   const section = resolveSection(pathname);

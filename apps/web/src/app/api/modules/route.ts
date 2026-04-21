@@ -6,7 +6,7 @@ export const runtime = 'nodejs'
 
 // Public read — no auth required
 export async function GET() {
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const { data, error } = await supabase
     .from('modules_catalog')
     .select('*')

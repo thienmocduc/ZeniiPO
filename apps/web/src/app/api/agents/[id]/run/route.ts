@@ -27,7 +27,7 @@ const BodySchema = z.object({
  * We invoke the agent, log to `agent_runs`, and return the output with
  * token + cost telemetry so the caller can surface billing.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // Service gate — return 503 if API key missing so ops can distinguish
   // "AI disabled" from "auth failed" / "bad request".
   if (!isAnthropicConfigured()) {
@@ -37,13 +37,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     )
   }
 
+  const { id } = await params
+
   // agent_code shape: lowercase alphanumeric + hyphen (e.g. `fin-01-plutus`).
   const agentCodeSchema = z
     .string()
     .min(3)
     .max(64)
     .regex(/^[a-z0-9-]+$/, 'agent_code must be lowercase alphanumeric or hyphen')
-  const codeCheck = agentCodeSchema.safeParse(params.id)
+  const codeCheck = agentCodeSchema.safeParse(id)
   if (!codeCheck.success) {
     return NextResponse.json({ error: 'Invalid agent id' }, { status: 400 })
   }
@@ -55,7 +57,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

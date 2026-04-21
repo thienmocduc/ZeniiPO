@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
  * Called from client via `fetch('/api/auth/signout', { method: 'POST' })`.
  */
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   await supabase.auth.signOut();
 
   const loginUrl = new URL('/login', request.url);

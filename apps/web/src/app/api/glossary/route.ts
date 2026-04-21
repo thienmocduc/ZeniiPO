@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 // Public read — no auth required. Searchable via ?q=
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const q = req.nextUrl.searchParams.get('q')?.trim() ?? ''
 
     let query = supabase.from('glossary').select('*')

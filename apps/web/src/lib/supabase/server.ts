@@ -7,8 +7,9 @@ import { cookies } from 'next/headers';
  *
  * Use `createServerClient()` in new code. `createClient()` kept as alias for existing callers.
  */
-export function createServerClient() {
-  const cookieStore = cookies();
+export async function createServerClient() {
+  // Next 15: cookies() is async.
+  const cookieStore = await cookies();
 
   return createSSRClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

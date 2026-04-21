@@ -95,7 +95,9 @@
       "mcp__Claude_in_Chrome__form_input",
       "Bash(nslookup -type=NS zeniipo.com 8.8.8.8)",
       "Bash(nslookup zeniipo.com 1.1.1.1)",
-      "Bash(nslookup -type=NS zeniipo.com 1.1.1.1)"
+      "Bash(nslookup -type=NS zeniipo.com 1.1.1.1)",
+      "Bash(pnpm audit *)",
+      "Bash(pnpm up *)"
     ]
   }
 }

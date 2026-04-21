@@ -12,13 +12,14 @@ const UpdateSchema = z.object({
   status: safeString.min(1).optional(),
 })
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const idCheck = safeUuid.safeParse(params.id)
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const idCheck = safeUuid.safeParse(id)
   if (!idCheck.success) {
     return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
   }
 
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -27,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const { data, error } = await supabase
     .from('ipo_journeys')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -35,8 +36,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return NextResponse.json({ data })
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const idCheck = safeUuid.safeParse(params.id)
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const idCheck = safeUuid.safeParse(id)
   if (!idCheck.success) {
     return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
   }
@@ -47,7 +49,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -56,7 +58,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { data, error } = await supabase
     .from('ipo_journeys')
     .update(parsed.data)
-    .eq('id', params.id)
+    .eq('id', id)
     .select()
     .single()
 
@@ -64,19 +66,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return NextResponse.json({ data })
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const idCheck = safeUuid.safeParse(params.id)
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const idCheck = safeUuid.safeParse(id)
   if (!idCheck.success) {
     return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
   }
 
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { error } = await supabase.from('ipo_journeys').delete().eq('id', params.id)
+  const { error } = await supabase.from('ipo_journeys').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data: { id: params.id } })
+  return NextResponse.json({ data: { id } })
 }
