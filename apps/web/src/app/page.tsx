@@ -299,7 +299,7 @@ export default function Home() {
           className="max-w-[1400px] mx-auto flex items-center justify-between px-6 md:px-10 h-16"
         >
           <Link href="/" className="font-display text-2xl font-bold tracking-tight">
-            Zen<span className="font-serif italic text-gold-light">iipo</span>
+            Zeni <span className="font-serif italic text-gold-light">iPO</span>
           </Link>
           <ul className="hidden lg:flex items-center gap-8 text-sm text-ink-2">
             {navLinks.map((l) => (
@@ -316,13 +316,13 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-sm text-ink-2 hover:text-ink transition-colors px-3 py-2"
+              className="text-sm text-ink-2 hover:text-ink transition-colors px-3 py-2 rounded hover:ring-1 hover:ring-chakra-6-glow/50 hover:shadow-[0_0_16px_rgba(99,102,241,0.25)]"
             >
               Đăng nhập
             </Link>
             <Link
               href="/signup"
-              className="inline-flex items-center gap-2 bg-gold-light text-bg font-medium text-sm px-4 py-2 rounded hover:bg-gold transition-colors"
+              className="inline-flex items-center gap-2 bg-gold-light text-bg font-medium text-sm px-4 py-2 rounded hover:bg-gold transition-all hover:shadow-[0_0_20px_rgba(99,102,241,0.35)]"
             >
               Dùng thử 14 ngày
               <ArrowRight size={16} />
@@ -348,7 +348,7 @@ export default function Home() {
               tư tưởng
             </span>{' '}
             đến ring-bell{' '}
-            <span className="gold-gradient font-display">SGX 2031</span>.
+            <span className="cosmic-gradient-text font-display">SGX 2031</span>.
           </h1>
 
           <p className="mt-8 max-w-2xl text-lg md:text-xl text-ink-2 leading-relaxed">
@@ -360,14 +360,14 @@ export default function Home() {
           <div className="mt-10 flex flex-wrap items-center gap-4">
             <Link
               href="/signup"
-              className="inline-flex items-center gap-2 bg-gold-light text-bg font-semibold text-base px-6 py-3.5 rounded hover:bg-gold transition-colors"
+              className="inline-flex items-center gap-2 bg-gold-light text-bg font-semibold text-base px-6 py-3.5 rounded hover:bg-gold transition-all hover:shadow-[0_10px_32px_rgba(99,102,241,0.35)]"
             >
               Dùng thử 14 ngày miễn phí
               <ArrowRight size={18} />
             </Link>
             <a
               href="#features"
-              className="inline-flex items-center gap-2 border border-w-16 text-ink text-base px-6 py-3.5 rounded hover:border-gold-light hover:text-gold-light transition-colors"
+              className="inline-flex items-center gap-2 border border-w-16 text-ink text-base px-6 py-3.5 rounded hover:border-chakra-6-glow hover:text-chakra-7-violet transition-colors"
             >
               Xem tính năng
             </a>
@@ -791,7 +791,7 @@ export default function Home() {
                 href="/"
                 className="font-display text-2xl font-bold tracking-tight"
               >
-                Zen<span className="font-serif italic text-gold-light">iipo</span>
+                Zeni <span className="font-serif italic text-gold-light">iPO</span>
               </Link>
               <p className="mt-4 font-serif italic text-ink-2 max-w-md leading-relaxed">
                 Tĩnh lặng · Hiện diện · Phục hưng sự sống

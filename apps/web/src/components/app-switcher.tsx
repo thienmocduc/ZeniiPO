@@ -69,7 +69,7 @@ export function AppSwitcher() {
           className="flex items-center gap-2 h-9 px-3 rounded border border-w-12 bg-panel-2 hover:bg-w-8 text-sm text-ink transition-colors"
         >
           <span className="font-display font-semibold text-gold-light">
-            Zeniipo
+            Zeni iPO
           </span>
           <ChevronDown size={14} className="text-ink-dim" />
         </button>

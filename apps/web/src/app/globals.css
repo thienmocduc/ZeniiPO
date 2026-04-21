@@ -43,12 +43,51 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  /* Legacy — kept for backward compat (gold→cyan). Prefer .cosmic-gradient-text. */
   .gold-gradient {
     background: linear-gradient(135deg, #E4C16E 0%, #06b6d4 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     color: transparent;
+  }
+  /* Chakra 6→7 flow: indigo → violet → gold */
+  .cosmic-gradient-text {
+    background: linear-gradient(135deg, #4f46e5 0%, #a855f7 50%, #e4c16e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .cosmic-gradient-bg {
+    background: linear-gradient(135deg, #4f46e5 0%, #a855f7 50%, #e4c16e 100%);
+  }
+  /* Aurora drifting background — for decorative panels */
+  .aurora-bg {
+    background:
+      radial-gradient(55% 50% at 20% 30%, rgba(99, 102, 241, 0.22) 0%, transparent 65%),
+      radial-gradient(50% 55% at 80% 70%, rgba(168, 85, 247, 0.22) 0%, transparent 65%),
+      linear-gradient(135deg, rgba(49, 46, 129, 0.15) 0%, rgba(5, 7, 12, 0.8) 100%);
+    background-size: 200% 200%;
+    animation: aurora 20s ease-in-out infinite;
+    will-change: transform;
+  }
+  /* Soft crown glow top-center — gold Sahasrara radial */
+  .crown-glow {
+    position: relative;
+  }
+  .crown-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      50% 80% at 50% -10%,
+      rgba(228, 193, 110, 0.22) 0%,
+      rgba(228, 193, 110, 0.08) 35%,
+      transparent 65%
+    );
+    z-index: 0;
   }
   .hero-h1 {
     font-size: clamp(3rem, 8vw, 7rem);
@@ -57,13 +96,20 @@ body {
   }
 }
 
-/* Cosmos starfield background */
+/* Cosmos starfield background — enhanced with chakra 6/7 star colors */
 .cosmos {
-  background: radial-gradient(
-    ellipse at top,
-    rgba(228, 193, 110, 0.08) 0%,
-    rgba(5, 7, 12, 0) 55%
-  ), #05070C;
+  background:
+    radial-gradient(
+      ellipse at top,
+      rgba(99, 102, 241, 0.10) 0%,
+      rgba(5, 7, 12, 0) 55%
+    ),
+    radial-gradient(
+      ellipse at bottom,
+      rgba(168, 85, 247, 0.08) 0%,
+      rgba(5, 7, 12, 0) 60%
+    ),
+    #05070C;
 }
 .cosmos::before {
   content: '';
@@ -73,14 +119,15 @@ body {
     radial-gradient(1.5px 1.5px at 20px 30px, rgba(255, 255, 255, 0.8), transparent),
     radial-gradient(1px 1px at 60px 90px, rgba(228, 193, 110, 0.6), transparent),
     radial-gradient(1.5px 1.5px at 120px 180px, rgba(255, 255, 255, 0.5), transparent),
-    radial-gradient(1px 1px at 200px 50px, rgba(6, 182, 212, 0.5), transparent),
+    radial-gradient(1px 1px at 200px 50px, rgba(99, 102, 241, 0.6), transparent),
     radial-gradient(1.2px 1.2px at 280px 240px, rgba(255, 255, 255, 0.4), transparent),
     radial-gradient(1px 1px at 340px 110px, rgba(228, 193, 110, 0.5), transparent),
     radial-gradient(1.5px 1.5px at 100px 300px, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1px 1px at 260px 380px, rgba(168, 85, 247, 0.45), transparent),
+    radial-gradient(1px 1px at 260px 380px, rgba(168, 85, 247, 0.55), transparent),
     radial-gradient(1.2px 1.2px at 380px 320px, rgba(255, 255, 255, 0.5), transparent);
   background-size: 400px 400px;
   animation: drift 200s linear infinite;
   opacity: 0.85;
   pointer-events: none;
+  will-change: transform;
 }

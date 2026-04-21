@@ -66,7 +66,7 @@ export function Topbar({ user }: { user: TopbarUser }) {
     <header className="h-[64px] border-b border-w-12 bg-panel/80 backdrop-blur-sm sticky top-0 z-20 flex items-center px-6 gap-4">
       <div className="flex items-center gap-2 text-sm min-w-0">
         <span className="font-mono uppercase tracking-widest text-[.68rem] text-ink-dim">
-          Zeniipo
+          Zeni iPO
         </span>
         <span className="text-ink-dim">/</span>
         <span className="font-display text-ivory truncate">{section}</span>

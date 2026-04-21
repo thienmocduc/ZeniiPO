@@ -101,7 +101,7 @@ export function Sidebar() {
             Z
           </span>
           <span className="font-display text-lg text-ivory tracking-tight">
-            Zen<em className="italic text-gold-light not-italic-sm font-display">iipo</em>
+            Zeni <em className="italic text-gold-light font-display">iPO</em>
           </span>
         </Link>
       </div>

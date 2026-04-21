@@ -86,7 +86,16 @@
       "Bash(curl -s 'https://api.vercel.com/v6/deployments?projectId=prj_pRvc5dkmXtaoDlxErf6XGsHSJZD8&teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&limit=5' -H 'Authorization: Bearer __TRACKED_VAR__')",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\(JSON.stringify\\(j?.aliases?.[0]?.deploymentId||j,null,2\\).substring\\(0,200\\)\\)}\\)\")",
       "Bash(curl -s 'https://api.vercel.com/v3/deployments/dpl_Fnsc4WucZfdNQmQnjg2tMpD1yXry/events?teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&builds=1&limit=100' -H 'Authorization: Bearer __TRACKED_VAR__')",
-      "Bash(curl -s 'https://api.vercel.com/v3/deployments/dpl_Fnsc4WucZfdNQmQnjg2tMpD1yXry/events?teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&builds=1&limit=200' -H 'Authorization: Bearer __TRACKED_VAR__')"
+      "Bash(curl -s 'https://api.vercel.com/v3/deployments/dpl_Fnsc4WucZfdNQmQnjg2tMpD1yXry/events?teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&builds=1&limit=200' -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(curl -s 'https://api.namecheap.com/xml.response?ApiUser=thienmocduc&ApiKey=7a5bde7f4b8840089caf55923c052e40&UserName=thienmocduc&Command=namecheap.domains.getList&ClientIp=__TRACKED_VAR__&PageSize=3')",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__find",
+      "mcp__Claude_in_Chrome__form_input",
+      "Bash(nslookup -type=NS zeniipo.com 8.8.8.8)",
+      "Bash(nslookup zeniipo.com 1.1.1.1)",
+      "Bash(nslookup -type=NS zeniipo.com 1.1.1.1)"
     ]
   }
 }
