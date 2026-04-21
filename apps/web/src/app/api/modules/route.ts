@@ -10,7 +10,8 @@ export async function GET() {
   const { data, error } = await supabase
     .from('modules_catalog')
     .select('*')
-    .order('sort_order', { ascending: true })
+    .eq('is_enabled', true)
+    .order('display_order', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })

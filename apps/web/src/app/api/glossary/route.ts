@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     }
     // Basic ILIKE search across term/definition. Escape % and _ to keep LIKE literal.
     const safe = qCheck.data.replace(/[%_]/g, '\\$&')
-    query = query.or(`term.ilike.%${safe}%,definition.ilike.%${safe}%`)
+    query = query.or(`term.ilike.%${safe}%,definition_vi.ilike.%${safe}%,definition_en.ilike.%${safe}%`)
   }
 
   const { data, error } = await query.order('term', { ascending: true }).limit(200)

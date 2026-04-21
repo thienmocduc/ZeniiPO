@@ -22,7 +22,18 @@
       "Bash(node scripts/migrate.mjs --reset)",
       "Bash(node -e \"import\\('pg'\\).then\\(\\({default:{Client}}\\)=>{const c=new Client\\({connectionString:'postgresql://postgres:jrvt9_6cA%2ADsD@db.moduqdlwgbmvlwiiicqp.supabase.co:5432/postgres',ssl:{rejectUnauthorized:false}}\\);c.connect\\(\\).then\\(\\(\\)=>c.query\\('SELECT current_user, version\\(\\)'\\)\\).then\\(r=>{console.log\\(JSON.stringify\\(r.rows[0]\\)\\);return c.end\\(\\)}\\).catch\\(e=>{console.error\\('ERR:',e.message\\);process.exit\\(1\\)}\\)}\\)\")",
       "Bash(pnpm build *)",
-      "Bash(node scripts/parse-handbook.mjs)"
+      "Bash(node scripts/parse-handbook.mjs)",
+      "Bash(pnpm dev *)",
+      "Bash(curl -s -o /dev/null -w '%{http_code} %{size_download}b' http://localhost:3000__TRACKED_VAR__)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000__TRACKED_VAR__)",
+      "Bash(curl -s \"http://localhost:3000/api/modules\")",
+      "Bash(curl -s \"http://localhost:3000/api/glossary\")",
+      "Bash(node scripts/migrate.mjs)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('rows:',j.data?.length,'first:',j.data?.[0]?.module_code,'-',j.data?.[0]?.name_vi\\)}\\)\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('rows:',j.data?.length,'first:',j.data?.[0]?.term\\)}\\)\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{try{const j=JSON.parse\\(d\\);console.log\\('rows:',j.data?.length,'sample:',j.data?.[0]?.module_code,'-',j.data?.[0]?.name_vi\\);}catch\\(e\\){console.log\\('raw:',d.substring\\(0,200\\)\\)}}\\)\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{try{const j=JSON.parse\\(d\\);console.log\\('rows:',j.data?.length,'sample:',j.data?.[0]?.term\\);}catch\\(e\\){console.log\\('raw:',d.substring\\(0,200\\)\\)}}\\)\")"
     ]
   }
 }
