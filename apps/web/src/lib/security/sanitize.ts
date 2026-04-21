@@ -1,5 +1,13 @@
-import DOMPurify from 'isomorphic-dompurify'
+/**
+ * HTML sanitization. Loads DOMPurify + jsdom lazily (they're not needed
+ * for simple string validation — use schemas.ts for that).
+ * Keep this file imported ONLY by routes that actually need to sanitize
+ * untrusted HTML input (e.g. rich-text form bodies).
+ */
 import { z } from 'zod'
+
+// Re-export common schemas from schemas.ts for backwards compatibility.
+export { safeString, safeEmail, safeSlug, safeUrl, safeUuid } from './schemas'
 
 const ALLOWED_TAGS = [
   'b',
@@ -25,6 +33,9 @@ const ALLOWED_ATTR = ['href', 'target', 'rel']
  * Safe for server & client (isomorphic-dompurify).
  */
 export function sanitizeHtml(dirty: string): string {
+  // Lazy import — only load DOMPurify when actually called.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const DOMPurify = require('isomorphic-dompurify') as { sanitize: typeof import('isomorphic-dompurify').sanitize }
   return DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
@@ -33,25 +44,5 @@ export function sanitizeHtml(dirty: string): string {
   })
 }
 
-/* ----- Reusable Zod schemas -------------------------------------------- */
-
-/** Plain string: trimmed, ≤1000 chars. Use for short-ish user input. */
-export const safeString = z.string().trim().max(1000)
-
 /** Rich-text body: ≤10k chars, then sanitized via DOMPurify. */
 export const safeHtml = z.string().max(10000).transform(sanitizeHtml)
-
-/** Email: lower-cased, RFC-valid, ≤255 chars. */
-export const safeEmail = z.string().email().max(255).toLowerCase()
-
-/** Slug: lower-kebab alphanumeric, ≤50 chars. */
-export const safeSlug = z
-  .string()
-  .regex(/^[a-z0-9-]+$/, 'must be lowercase letters, digits, or hyphens')
-  .max(50)
-
-/** URL: well-formed, ≤2000 chars. */
-export const safeUrl = z.string().url().max(2000)
-
-/** UUID v1-v5. */
-export const safeUuid = z.string().uuid()

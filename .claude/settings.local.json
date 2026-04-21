@@ -74,7 +74,11 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -I \"https://zeniipo.com/\")",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" \"http://zeniipo.com/\" -L)",
       "Bash(curl -s https://api.ipify.org)",
-      "Bash(curl -s 'https://api.namecheap.com/xml.response?ApiUser=thienmocduc&ApiKey=7a5bde7f4b8840089caf55923c052e40&UserName=thienmocduc&Command=namecheap.domains.getList&ClientIp=__TRACKED_VAR__&PageSize=10')"
+      "Bash(curl -s 'https://api.namecheap.com/xml.response?ApiUser=thienmocduc&ApiKey=7a5bde7f4b8840089caf55923c052e40&UserName=thienmocduc&Command=namecheap.domains.getList&ClientIp=__TRACKED_VAR__&PageSize=10')",
+      "Bash(curl -s 'https://api.vercel.com/v6/deployments?projectId=prj_pRvc5dkmXtaoDlxErf6XGsHSJZD8&teamId=team_5x9m34Ihn6TpzsmzVXDcam0a&limit=3&target=production' -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);j.deployments.forEach\\(dep=>console.log\\(dep.uid,'|',new Date\\(dep.createdAt\\).toISOString\\(\\).substring\\(0,19\\),'|',dep.state,'|',dep.meta?.githubCommitSha?.substring\\(0,7\\)\\)\\)}\\)\")",
+      "Bash(curl -s \"https://zeniipo.vercel.app/api/dashboard\" -w \"\\\\n%{http_code}\\\\n\")",
+      "Bash(curl -s \"https://zeniipo.vercel.app/api/journeys\" -w \"\\\\n%{http_code}\\\\n\")"
     ]
   }
 }
