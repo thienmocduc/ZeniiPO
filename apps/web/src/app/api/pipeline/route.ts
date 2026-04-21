@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/api/tenant'
-import { safeString, safeEmail, safeUuid } from '@/lib/security/sanitize'
+import { safeString, safeEmail, safeUuid } from '@/lib/security/schemas'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
