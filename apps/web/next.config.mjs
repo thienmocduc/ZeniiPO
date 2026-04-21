@@ -29,6 +29,16 @@ const nextConfig = {
   },
   experimental: {
     serverActions: { bodySizeLimit: '2mb' },
+    serverComponentsExternalPackages: ['isomorphic-dompurify', 'jsdom'],
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || []
+      if (Array.isArray(config.externals)) {
+        config.externals.push('isomorphic-dompurify', 'jsdom')
+      }
+    }
+    return config
   },
 }
 

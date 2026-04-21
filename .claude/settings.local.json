@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -l \"C:/Users/Admin/Documents/files.zip\")",
+      "Bash(unzip -o \"C:/Users/Admin/Documents/files.zip\" -d \"C:/Users/Admin/Documents/Zeni-Digital-Web3/Zeni-iPO/_source/\")",
+      "Bash(unzip -o zeniipo_deploy_v1.zip -d zeniipo_deploy/)",
+      "Bash(npm -v)",
+      "Bash(npm ls *)",
+      "Bash(git config *)",
+      "Bash(gh --version)",
+      "Bash(pnpm create *)",
+      "Bash(npx --yes create-next-app@14 web --typescript --tailwind --app --src-dir --import-alias \"@/*\" --use-pnpm --no-eslint --skip-install)",
+      "Bash(npm install *)",
+      "Bash(supabase --version)",
+      "Bash(pnpm install *)",
+      "Bash(vercel --version)",
+      "Bash(gh auth *)",
+      "Bash(curl -s \"https://api.github.com/repos/thienmocduc/ZeniOS-Web3\")",
+      "Bash(python -m json.tool)",
+      "Bash(gh api *)",
+      "Bash(pnpm add *)",
+      "Bash(node scripts/migrate.mjs --reset)",
+      "Bash(node -e \"import\\('pg'\\).then\\(\\({default:{Client}}\\)=>{const c=new Client\\({connectionString:'postgresql://postgres:jrvt9_6cA%2ADsD@db.moduqdlwgbmvlwiiicqp.supabase.co:5432/postgres',ssl:{rejectUnauthorized:false}}\\);c.connect\\(\\).then\\(\\(\\)=>c.query\\('SELECT current_user, version\\(\\)'\\)\\).then\\(r=>{console.log\\(JSON.stringify\\(r.rows[0]\\)\\);return c.end\\(\\)}\\).catch\\(e=>{console.error\\('ERR:',e.message\\);process.exit\\(1\\)}\\)}\\)\")",
+      "Bash(pnpm build *)",
+      "Bash(node scripts/parse-handbook.mjs)"
+    ]
+  }
+}
