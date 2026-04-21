@@ -68,7 +68,13 @@
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const evs=JSON.parse\\(d\\);evs.filter\\(e=>e.text&&\\(e.text.includes\\('glossary'\\)||e.text.includes\\('error'\\)||e.text.includes\\('Error'\\)\\)\\).slice\\(0,5\\).forEach\\(e=>console.log\\('›',e.text.substring\\(0,300\\)\\)\\)}\\)\")",
       "Bash(curl -s \"https://zeniipo.vercel.app/api/glossary\" -w \"\\\\n%{http_code}\\\\n\")",
       "Bash(curl -s \"https://zeniipo.vercel.app/api/glossary?q=ARR\" -w \"\\\\n%{http_code}\\\\n\")",
-      "Bash(curl -s \"http://localhost:3000/api/glossary\" -w \"\\\\n%{http_code}\\\\n\")"
+      "Bash(curl -s \"http://localhost:3000/api/glossary\" -w \"\\\\n%{http_code}\\\\n\")",
+      "Bash(curl -s \"https://zeniipo.vercel.app/api/journeys\" -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Bash(nslookup zeniipo.com 8.8.8.8)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -I \"https://zeniipo.com/\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" \"http://zeniipo.com/\" -L)",
+      "Bash(curl -s https://api.ipify.org)",
+      "Bash(curl -s 'https://api.namecheap.com/xml.response?ApiUser=thienmocduc&ApiKey=7a5bde7f4b8840089caf55923c052e40&UserName=thienmocduc&Command=namecheap.domains.getList&ClientIp=__TRACKED_VAR__&PageSize=10')"
     ]
   }
 }

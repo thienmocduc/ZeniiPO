@@ -17,45 +17,60 @@ const CreateSchema = z.object({
 })
 
 export async function GET() {
-  const supabase = createServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = createServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
-    .from('ipo_journeys')
-    .select('*')
-    .order('created_at', { ascending: false })
+    const { data, error } = await supabase
+      .from('ipo_journeys')
+      .select('*')
+      .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+    if (error) {
+      console.error('[journeys GET] query error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json({ data })
+  } catch (err) {
+    console.error('[journeys GET] handler exception:', err)
+    const message = err instanceof Error ? err.message : 'Internal error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}))
-  const parsed = CreateSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+  try {
+    const body = await req.json().catch(() => ({}))
+    const parsed = CreateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+    }
+
+    const supabase = createServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const tenantId = await getCurrentTenantId(supabase, user.id)
+    if (!tenantId) {
+      return NextResponse.json({ error: 'No tenant for user' }, { status: 403 })
+    }
+
+    const { data, error } = await supabase
+      .from('ipo_journeys')
+      .insert({ ...parsed.data, tenant_id: tenantId })
+      .select()
+      .single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ data }, { status: 201 })
+  } catch (err) {
+    console.error('[journeys POST] handler exception:', err)
+    const message = err instanceof Error ? err.message : 'Internal error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
-
-  const supabase = createServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const tenantId = await getCurrentTenantId(supabase, user.id)
-  if (!tenantId) {
-    return NextResponse.json({ error: 'No tenant for user' }, { status: 403 })
-  }
-
-  const { data, error } = await supabase
-    .from('ipo_journeys')
-    .insert({ ...parsed.data, tenant_id: tenantId })
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data }, { status: 201 })
 }

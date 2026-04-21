@@ -40,6 +40,13 @@ BEGIN
   END IF;
 END $$;
 
+-- Set search_path on SECURITY DEFINER functions so they can find public tables
+-- when invoked by supabase_auth_admin (default search_path doesn't include public)
+ALTER FUNCTION public.handle_new_user() SET search_path = public, pg_temp;
+ALTER FUNCTION public.current_tenant_id() SET search_path = public, pg_temp;
+ALTER FUNCTION public.has_role(text) SET search_path = public, pg_temp;
+ALTER FUNCTION public.is_chr_or_ceo() SET search_path = public, pg_temp;
+
 -- GRANT SELECT to anon + authenticated on catalog tables
 -- (RLS policy gates row-level, GRANT gates schema-level table access)
 DO $$
