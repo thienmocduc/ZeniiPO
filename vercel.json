@@ -1,10 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm turbo run build --filter=@zeniipo/web",
-  "devCommand": "pnpm turbo run dev --filter=@zeniipo/web",
-  "installCommand": "pnpm install --no-frozen-lockfile",
-  "framework": "nextjs",
-  "outputDirectory": "apps/web/.next",
   "regions": ["sin1"],
   "github": { "silent": true }
 }
