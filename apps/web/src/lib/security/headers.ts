@@ -5,22 +5,37 @@ import type { NextResponse } from 'next/server'
  * CSP allow-lists only what Zeniipo genuinely needs:
  * - Supabase (auth/data), Stripe (payments), Upstash (rate-limit), Anthropic (AI), Google Fonts.
  */
+/**
+ * CSP allow-lists only what Zeniipo needs:
+ * - zeniipo.com + *.zeniipo.com (self + all subdomains: app, api, admin, academy, ...)
+ * - Supabase (auth/data), Stripe (payments), Upstash (rate-limit), Anthropic (AI)
+ * - Google Fonts, Vercel analytics, Sentry
+ */
 export const securityHeaders: Record<string, string> = {
   'Content-Security-Policy':
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.supabase.co; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-    "font-src 'self' https://fonts.gstatic.com data:; " +
-    "img-src 'self' data: https: blob:; " +
-    "connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.stripe.com https://*.upstash.io; " +
-    "frame-src https://js.stripe.com; " +
-    "frame-ancestors 'none'",
+    "default-src 'self' https://zeniipo.com https://*.zeniipo.com; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://zeniipo.com https://*.zeniipo.com https://js.stripe.com https://*.supabase.co https://va.vercel-scripts.com https://*.sentry.io; " +
+    "style-src 'self' 'unsafe-inline' https://zeniipo.com https://*.zeniipo.com https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com data: https://zeniipo.com https://*.zeniipo.com; " +
+    "img-src 'self' data: blob: https: https://zeniipo.com https://*.zeniipo.com; " +
+    "connect-src 'self' https://zeniipo.com https://*.zeniipo.com https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://api.stripe.com https://*.upstash.io https://*.ingest.sentry.io https://vitals.vercel-insights.com; " +
+    "frame-src https://js.stripe.com https://*.stripe.com; " +
+    "frame-ancestors 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self' https://zeniipo.com https://*.zeniipo.com; " +
+    "object-src 'none'; " +
+    "upgrade-insecure-requests",
   'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Permissions-Policy':
+    'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com"), usb=(), magnetometer=(), accelerometer=(), gyroscope=()',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
   'X-XSS-Protection': '1; mode=block',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-site',
+  'X-DNS-Prefetch-Control': 'on',
+  'X-Permitted-Cross-Domain-Policies': 'none',
 }
 
 /**

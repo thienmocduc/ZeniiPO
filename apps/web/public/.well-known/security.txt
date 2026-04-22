@@ -1,0 +1,9 @@
+Contact: mailto:security@zeniipo.com
+Contact: mailto:doanhnhancaotuan@gmail.com
+Expires: 2027-04-21T00:00:00.000Z
+Encryption: https://zeniipo.com/.well-known/pgp-key.txt
+Preferred-Languages: vi, en
+Canonical: https://zeniipo.com/.well-known/security.txt
+Policy: https://zeniipo.com/security
+Acknowledgments: https://zeniipo.com/security#hall-of-fame
+Hiring: https://zeniipo.com/careers
