@@ -105,7 +105,15 @@
       "Bash(curl -s -o /dev/null -w \"zeniipo.com → HTTP %{http_code} · IP %{remote_ip} · time %{time_total}s\\\\n\" --connect-timeout 8 -L \"https://zeniipo.com/\")",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\(JSON.stringify\\({nameservers:j.nameservers,misconfigured:j.misconfigured,configuredBy:j.configuredBy,serviceType:j.serviceType},null,2\\)\\)}\\)\")",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('nameservers:',j.nameservers\\);console.log\\('misconfigured:',j.misconfigured\\);console.log\\('serviceType:',j.serviceType\\)}\\)\")",
-      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} · IP %{remote_ip}\\\\n\" --connect-timeout 8 \"https://zeniipo.com/\")"
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} · IP %{remote_ip}\\\\n\" --connect-timeout 8 \"https://zeniipo.com/\")",
+      "Bash(nslookup www.zeniipo.com 1.1.1.1)",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\(JSON.stringify\\({nameservers:j.nameservers,aValues:j.aValues,cnames:j.cnames,misconfigured:j.misconfigured,configuredBy:j.configuredBy,recommendedIPv4:j.recommendedIPv4?.[0]?.value},null,2\\)\\)}\\)\")",
+      "Bash(curl -s -o /dev/null -w \"zeniipo.com → HTTP %{http_code} · IP %{remote_ip} · time %{time_total}s\\\\n\" --connect-timeout 10 \"https://zeniipo.com/\")",
+      "Bash(curl -s -o /dev/null -w \"www.zeniipo.com → HTTP %{http_code} · IP %{remote_ip} · time %{time_total}s\\\\n\" --connect-timeout 10 \"https://www.zeniipo.com/\")",
+      "Bash(curl -sI \"https://www.zeniipo.com/\")",
+      "Bash(curl -v \"https://zeniipo.com/\" --connect-timeout 5 -o /dev/null)",
+      "Bash(curl -s -o /dev/null -w \"HTTP zeniipo.com → %{http_code} · IP %{remote_ip}\\\\n\" --connect-timeout 8 \"http://zeniipo.com/\")",
+      "Bash(node scripts/backtest-ipo-flow.mjs --url=https://zeniipo.com)"
     ]
   }
 }

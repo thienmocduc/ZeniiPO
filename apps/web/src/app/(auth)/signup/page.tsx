@@ -9,18 +9,28 @@ import { Check, Loader2, X, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 const passwordRules = {
-  length: (v: string) => v.length >= 8,
+  length: (v: string) => v.length >= 12,
   upper: (v: string) => /[A-Z]/.test(v),
+  lower: (v: string) => /[a-z]/.test(v),
   digit: (v: string) => /\d/.test(v),
   special: (v: string) => /[^A-Za-z0-9]/.test(v),
+  noRepeat: (v: string) => !/(.)\1{2,}/.test(v),
+  noCommon: (v: string) =>
+    !['password', '12345678', 'qwerty', 'zeniipo', 'admin', 'chairman', 'iloveyou'].some((bad) =>
+      v.toLowerCase().includes(bad),
+    ),
 };
 
 const passwordSchema = z
   .string()
-  .min(8, 'Mật khẩu tối thiểu 8 ký tự')
+  .min(12, 'Mật khẩu tối thiểu 12 ký tự')
+  .max(128, 'Mật khẩu tối đa 128 ký tự')
   .refine(passwordRules.upper, 'Cần ít nhất 1 chữ IN HOA')
+  .refine(passwordRules.lower, 'Cần ít nhất 1 chữ thường')
   .refine(passwordRules.digit, 'Cần ít nhất 1 chữ số')
-  .refine(passwordRules.special, 'Cần ít nhất 1 ký tự đặc biệt');
+  .refine(passwordRules.special, 'Cần ít nhất 1 ký tự đặc biệt')
+  .refine(passwordRules.noRepeat, 'Không lặp 1 ký tự ≥3 lần liên tiếp')
+  .refine(passwordRules.noCommon, 'Tránh từ ngữ phổ biến (password, admin, chairman, ...)');
 
 const schema = z.object({
   full_name: z.string().min(2, 'Vui lòng nhập họ tên đầy đủ'),
