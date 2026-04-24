@@ -1,10 +1,5 @@
-export default function GovernanceDocsPage() {
-  return (
-    <div className="space-y-6">
-      <h1 className="font-display text-3xl text-ivory">Governance Docs</h1>
-      <p className="text-ink-2 font-serif italic">
-        Coming soon · dữ liệu sẽ kết nối với Supabase.
-      </p>
-    </div>
-  );
+import { V1Page } from '@/lib/v1/Page';
+
+export default function Page() {
+  return <V1Page pageId="gvdoc" />;
 }

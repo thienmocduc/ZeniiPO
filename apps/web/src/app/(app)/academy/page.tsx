@@ -1,10 +1,8 @@
+import { redirect } from 'next/navigation';
+
 export default function AcademyPage() {
-  return (
-    <div className="space-y-6">
-      <h1 className="font-display text-3xl text-ivory">Academy</h1>
-      <p className="text-ink-2 font-serif italic">
-        Coming soon · dữ liệu sẽ kết nối với Supabase.
-      </p>
-    </div>
-  );
+  // v1_8 merges academy into Unicorn Playbook (page-playbook). Preserve the
+  // /academy route so middleware PROTECTED_PREFIXES is unchanged but send
+  // visitors to the live module.
+  redirect('/playbook');
 }

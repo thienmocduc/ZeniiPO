@@ -6,6 +6,16 @@ html {
   scroll-behavior: smooth;
 }
 
+/* v1_8 CSS sets html,body { overflow:hidden } to lock the app shell so
+   .main can scroll independently. Landing page + auth pages render outside
+   the app shell and need normal body scroll. Re-enable scroll unless we're
+   inside the app shell (body has an .app descendant). */
+:where(html):not(:has(.app)),
+:where(html):not(:has(.app)) body {
+  overflow: auto !important;
+  height: auto !important;
+}
+
 body {
   font-family: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
   background: #05070C;

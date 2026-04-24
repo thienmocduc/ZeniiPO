@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Fraunces, Cormorant_Garamond, Noto_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import { getCss } from '@/lib/v1/extract';
 import { CosmosBg } from '@/components/cosmos-bg';
 
 const fraunces = Fraunces({
@@ -85,12 +86,20 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Load the v1_8_FULL <style> block and inject into <head> so every page
+  // renders with the chairman's authoritative design system.
+  const v1Css = getCss();
+
   return (
     <html
       lang="vi"
       className={`${fraunces.variable} ${cormorant.variable} ${notoSans.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="bg-bg text-ink font-sans antialiased relative">
+      <head>
+        {/* v1_8_FULL.html CSS — byte-for-byte inherited */}
+        <style dangerouslySetInnerHTML={{ __html: v1Css }} />
+      </head>
+      <body>
         <CosmosBg />
         {children}
       </body>

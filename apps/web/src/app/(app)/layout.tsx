@@ -2,7 +2,10 @@ import { redirect } from 'next/navigation';
 import { createServerClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
-import { CosmosBg } from '@/components/cosmos-bg';
+import {
+  getSidebarInner,
+  rewriteSidebarForNextLinks,
+} from '@/lib/v1/extract';
 
 export default async function AppLayout({
   children,
@@ -18,14 +21,16 @@ export default async function AppLayout({
     redirect('/login');
   }
 
+  // Pull sidebar markup from v1_8 source and rewire <div data-page> → <a href="/route">
+  const sidebarHtml = rewriteSidebarForNextLinks(getSidebarInner());
+
   return (
-    <div className="flex min-h-screen bg-bg relative">
-      <CosmosBg />
-      <Sidebar />
-      <div className="flex-1 flex flex-col ml-[240px]">
-        <Topbar user={user} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    <>
+      <Topbar user={user} />
+      <div className="app">
+        <Sidebar html={sidebarHtml} />
+        <main className="main">{children}</main>
       </div>
-    </div>
+    </>
   );
 }

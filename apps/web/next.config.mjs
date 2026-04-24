@@ -11,10 +11,12 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: '/hq-docs', destination: '/academy/handbook', permanent: true },
-      { source: '/handbook/:path*', destination: '/academy/handbook/:path*', permanent: true },
-      { source: '/training/:path*', destination: '/academy/drills/:path*', permanent: true },
-      { source: '/training-hub', destination: '/academy/drills', permanent: true },
+      // Legacy /hq-docs + /handbook → v1_8 Unicorn Playbook DB
+      { source: '/hq-docs', destination: '/playbook', permanent: true },
+      { source: '/handbook/:path*', destination: '/playbook', permanent: true },
+      // /training-hub → v1_8 Training Hub (keep /training/* direct since it
+      // is the new route; only /training-hub needs redirect)
+      { source: '/training-hub', destination: '/training', permanent: true },
     ]
   },
   async headers() {
@@ -30,6 +32,12 @@ const nextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: '2mb' },
     serverComponentsExternalPackages: ['isomorphic-dompurify', 'jsdom'],
+  },
+  // Ensure v1_8_FULL.html is traced into the server bundle on Vercel so
+  // readFileSync at runtime finds it. Next's output file tracer usually
+  // can't see arbitrary readFileSync paths — include it explicitly.
+  outputFileTracingIncludes: {
+    '/**': ['./src/lib/v1/source.html'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
