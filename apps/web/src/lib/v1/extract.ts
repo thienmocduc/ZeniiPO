@@ -151,10 +151,10 @@ export function getPageInner(pageId: string): string {
   const openStart = m.index;
   const openEnd = m.index + m[0].length;
   const absEnd = findMatchingDivEnd(main, openStart);
-  // Inner HTML (strip outer <div> + </div>) and remove inline JS handlers.
-  const inner = stripInlineHandlers(
-    main.slice(openEnd, absEnd - '</div>'.length).trim(),
-  );
+  // Inner HTML (strip outer <div> + </div>). Keep inline `on*=` handlers —
+  // V1Interactivity injects the v1_8 script as window-level functions so the
+  // inline `onclick="openAgentModal('strategy')"` etc. resolve at runtime.
+  const inner = main.slice(openEnd, absEnd - '</div>'.length).trim();
   _pageCache.set(pageId, inner);
   return inner;
 }
@@ -210,6 +210,34 @@ export function getLoginHtml(): string {
 // attach real listeners via useEffect.
 function stripInlineHandlers(html: string): string {
   return html.replace(/\s+on[a-z]+="[^"]*"/gi, '');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Modals / overlays — block AFTER `</main>` AFTER outer `</div>` and BEFORE
+// `<script>`. Includes: trOvl, trDone (drill overlay + completion modal),
+// agentModal, cmdPalette, flash, cmd-hint. Keeps inline handlers because
+// V1Interactivity exposes the matching functions on `window`.
+// ─────────────────────────────────────────────────────────────
+let _modalsCache: string | null = null;
+
+export function getModalsHtml(): string {
+  if (_modalsCache != null) return _modalsCache;
+  const src = loadSource();
+  const mainClose = src.indexOf('</main>');
+  if (mainClose < 0) {
+    _modalsCache = '';
+    return _modalsCache;
+  }
+  // Skip past `</main>\n\n</div>` to land on the first modal opener.
+  const afterMain = src.indexOf('</div>', mainClose);
+  const startSearch = afterMain >= 0 ? afterMain + '</div>'.length : mainClose + '</main>'.length;
+  const scriptOpen = src.indexOf('<script>', startSearch);
+  if (scriptOpen < 0) {
+    _modalsCache = '';
+    return _modalsCache;
+  }
+  _modalsCache = src.slice(startSearch, scriptOpen).trim();
+  return _modalsCache;
 }
 
 // ─────────────────────────────────────────────────────────────

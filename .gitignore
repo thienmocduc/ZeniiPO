@@ -63,3 +63,13 @@ supabase/.temp
 next-env.d.ts
 
 .vercel
+
+# python sidecar (services/python)
+services/python/.venv/
+services/python/__pycache__/
+services/python/**/__pycache__/
+services/python/.pytest_cache/
+services/python/.ruff_cache/
+services/python/.mypy_cache/
+services/python/uv.lock
+services/python/*.egg-info/

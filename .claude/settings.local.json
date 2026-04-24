@@ -97,7 +97,15 @@
       "Bash(nslookup zeniipo.com 1.1.1.1)",
       "Bash(nslookup -type=NS zeniipo.com 1.1.1.1)",
       "Bash(pnpm audit *)",
-      "Bash(pnpm up *)"
+      "Bash(pnpm up *)",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} · %{size_download}b · %{time_total}s' https://zeniipo.vercel.app__TRACKED_VAR__)",
+      "Bash(curl -s \"https://zeniipo.vercel.app/login\")",
+      "Bash(curl -s -L \"https://zeniipo.vercel.app/dashboard\" -o /dev/null -w \"Final URL: %{url_effective} · HTTP %{http_code}\\\\n\")",
+      "Bash(curl -s -o /dev/null -w \"zeniipo.com → HTTP %{http_code} · IP %{remote_ip} · time %{time_total}s\\\\n\" --connect-timeout 8 -L \"https://zeniipo.com/\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\(JSON.stringify\\({nameservers:j.nameservers,misconfigured:j.misconfigured,configuredBy:j.configuredBy,serviceType:j.serviceType},null,2\\)\\)}\\)\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('nameservers:',j.nameservers\\);console.log\\('misconfigured:',j.misconfigured\\);console.log\\('serviceType:',j.serviceType\\)}\\)\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} · IP %{remote_ip}\\\\n\" --connect-timeout 8 \"https://zeniipo.com/\")"
     ]
   }
 }
