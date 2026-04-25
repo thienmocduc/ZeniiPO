@@ -76,7 +76,7 @@ async function main() {
       `SELECT count(*) AS c FROM pg_class c JOIN pg_namespace n ON c.relnamespace=n.oid
        WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity=false`,
     )
-    ok('All public tables RLS-enabled', noRls.rows[0].c === 0, `${noRls.rows[0].c} without RLS`)
+    ok('All public tables RLS-enabled', noRls.rows[0].c == 0, `${noRls.rows[0].c} without RLS`)
 
     const tenants = await pgc.query(
       `SELECT slug, name FROM tenants WHERE slug IN ('anima','zeni','biotea','wellkoc','zenidigital','zenichain','bthome','nexbuild') ORDER BY slug`,
@@ -84,23 +84,23 @@ async function main() {
     ok('8 Zeni ecosystem tenants seeded', tenants.rows.length === 8, tenants.rows.map((r) => r.slug).join(', '))
 
     const modules = await pgc.query(`SELECT count(*) AS c FROM modules_catalog`)
-    ok('32 modules catalog seeded', modules.rows[0].c === 32, `${modules.rows[0].c} rows`)
+    ok('32 modules catalog seeded', modules.rows[0].c == 32, `${modules.rows[0].c} rows`)
 
     const agents = await pgc.query(`SELECT count(*) AS c FROM agent_catalog`)
-    ok('108 AI agents catalog', agents.rows[0].c === 108, `${agents.rows[0].c} rows`)
+    ok('108 AI agents catalog', agents.rows[0].c == 108, `${agents.rows[0].c} rows`)
 
     const phaseContent = await pgc.query(`SELECT count(*) AS c, count(DISTINCT phase_num) AS p FROM phase_content`)
     ok(
       'Phase content covers 10 phases',
-      phaseContent.rows[0].p === 10,
+      phaseContent.rows[0].p == 10,
       `${phaseContent.rows[0].c} sections × ${phaseContent.rows[0].p} phases`,
     )
 
     const criteriaTpl = await pgc.query(`SELECT count(*) AS c FROM ipo_readiness_criteria_template`)
-    ok('20 IPO readiness criteria template', criteriaTpl.rows[0].c === 20, `${criteriaTpl.rows[0].c}`)
+    ok('20 IPO readiness criteria template', criteriaTpl.rows[0].c == 20, `${criteriaTpl.rows[0].c}`)
 
     const tiers = await pgc.query(`SELECT count(*) AS c FROM membership_tiers`)
-    ok('5 membership tiers seeded', tiers.rows[0].c === 5, `${tiers.rows[0].c}`)
+    ok('5 membership tiers seeded', tiers.rows[0].c == 5, `${tiers.rows[0].c}`)
 
     const drills = await pgc.query(`SELECT count(*) AS c FROM training_drills`)
     ok(
@@ -126,7 +126,9 @@ async function main() {
   ok('GET /api/health → 200', (await fetchHead('/api/health')) === 200)
   ok('GET /api/modules (public) → 200', (await fetchHead('/api/modules')) === 200)
   ok('GET /api/glossary (public) → 200', (await fetchHead('/api/glossary')) === 200)
-  ok('GET /dashboard (no auth) → 307 redirect', (await fetchHead('/dashboard')) === 307)
+  // Use redirect:'manual' so we see the 307 instead of following.
+  const dashStatus = await fetch(`${URL}/dashboard`, { redirect: 'manual' }).then((r) => r.status).catch(() => 0)
+  ok('GET /dashboard (no auth) → 307/308 redirect', dashStatus === 307 || dashStatus === 308 || dashStatus === 302, `status=${dashStatus}`)
   ok('GET /api/dashboard (no auth) → 401', (await fetchHead('/api/dashboard')) === 401)
 
   // ─── Security headers on prod ──────────────────────────────
@@ -212,7 +214,7 @@ async function main() {
       `SELECT count(*) AS c FROM ipo_readiness_criteria WHERE tenant_id=$1`,
       [tenantA],
     )
-    ok('20 readiness criteria seeded for new journey', cri.rows[0].c === 20, `${cri.rows[0].c} rows`)
+    ok('20 readiness criteria seeded for new journey', cri.rows[0].c == 20, `${cri.rows[0].c} rows`)
 
     const score = await userClient.rpc('compute_readiness_score', {
       p_journey_id: (await userClient.from('ipo_journeys').select('id').single()).data.id,
