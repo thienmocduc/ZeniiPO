@@ -31,8 +31,8 @@ const nextConfig = {
   },
   experimental: {
     serverActions: { bodySizeLimit: '2mb' },
-    serverComponentsExternalPackages: ['isomorphic-dompurify', 'jsdom'],
   },
+  serverExternalPackages: ['isomorphic-dompurify', 'jsdom'],
   // Ensure v1_8_FULL.html is traced into the server bundle on Vercel so
   // readFileSync at runtime finds it. Next's output file tracer usually
   // can't see arbitrary readFileSync paths — include it explicitly.
