@@ -10,8 +10,6 @@ export const runtime = 'nodejs'
 const PLANS = ['explorer', 'pro', 'elite', 'enterprise'] as const
 const Schema = z.object({ plan: z.enum(PLANS) })
 
-// TODO: replace these placeholder price IDs with real Stripe Price IDs once
-// products are created in the Stripe dashboard. Store in env, not in code.
 function priceIdFor(plan: (typeof PLANS)[number]): string | undefined {
   switch (plan) {
     case 'explorer':
