@@ -24,6 +24,22 @@ export default async function AppLayout({
     redirect('/login');
   }
 
+  // Onboarding gate: if the tenant has no IPO journey yet, push the user
+  // through the 3-step wizard before any app page renders.
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('tenant_id')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (profile?.tenant_id) {
+    const { count } = await supabase
+      .from('ipo_journeys')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', profile.tenant_id);
+    // /onboarding is OUTSIDE this (app) layout, so redirect is loop-safe.
+    if ((count ?? 0) === 0) redirect('/onboarding');
+  }
+
   // Pull sidebar markup from v1_8 source and rewire <div data-page> → <a href="/route">
   const sidebarHtml = rewriteSidebarForNextLinks(getSidebarInner());
   // Pull the v1_8 inline <script> block — V1Interactivity executes it once
