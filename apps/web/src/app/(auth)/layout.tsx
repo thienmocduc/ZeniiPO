@@ -33,22 +33,24 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         }}
       />
 
-      {/* Gold Z logo top-center */}
+      {/* Gold Z logo + Zeniipo wordmark + "Trở về trang chủ" link — single row, top-center */}
       <Link
         href="/"
-        aria-label="Về trang chủ Zeniipo"
-        className="absolute top-6 left-1/2 -translate-x-1/2 group z-20"
+        aria-label="Trở về trang chủ Zeniipo"
+        className="absolute top-6 left-1/2 -translate-x-1/2 group z-20 flex items-center gap-3"
       >
-        <div className="flex flex-col items-center gap-1.5">
-          <span
-            className="inline-flex items-center justify-center w-11 h-11 rounded-full border border-gold/60 bg-bg/60 backdrop-blur-sm font-serif italic text-xl font-semibold text-gold-light shadow-[0_0_24px_rgba(228,193,110,0.28)] transition group-hover:border-gold group-hover:shadow-[0_0_36px_rgba(228,193,110,0.5)]"
-          >
-            Z
-          </span>
-          <span className="font-mono text-[0.58rem] uppercase tracking-widest text-ink-dim group-hover:text-gold-light transition">
-            Về trang chủ
-          </span>
-        </div>
+        <span
+          className="inline-flex items-center justify-center w-11 h-11 rounded-full border border-gold/60 bg-bg/60 backdrop-blur-sm font-serif italic text-xl font-semibold text-gold-light shadow-[0_0_24px_rgba(228,193,110,0.28)] transition group-hover:border-gold group-hover:shadow-[0_0_36px_rgba(228,193,110,0.5)]"
+        >
+          Z
+        </span>
+        <span className="font-serif text-base font-medium text-gold-light tracking-wide">
+          Zeniipo
+        </span>
+        <span aria-hidden className="text-ink-dim/60">·</span>
+        <span className="font-mono text-[0.7rem] uppercase tracking-widest text-ink-dim group-hover:text-gold-light transition">
+          ← Trở về trang chủ
+        </span>
       </Link>
 
       {/* Centered card */}
