@@ -74,13 +74,23 @@ export const metadata: Metadata = {
       },
     ],
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Zeniipo',
+  },
+  manifest: '/manifest.webmanifest',
 };
 
 export const viewport: Viewport = {
-  themeColor: '#05070C',
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#05070C' },
+    { media: '(prefers-color-scheme: light)', color: '#05070C' },
+  ],
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
