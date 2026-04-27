@@ -10,7 +10,7 @@ export async function GET() {
   const supabase = await createServerClient()
   const auth = await requireUserAndTenant(supabase)
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.message }, { status: 500 })
+    return NextResponse.json({ error: auth.message }, { status: auth.status })
   }
   // Find pitch folders by name match
   const { data: folders } = await supabase
