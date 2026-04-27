@@ -35,13 +35,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No tenant for user' }, { status: 403 })
   }
 
+  // RPC signature: cascade_chairman_event(p_tenant_id, p_valuation, p_venue,
+  //   p_year, p_industry, p_strategy). p_venue must match
+  //   ipo_journeys.exit_venue check (sgx | nasdaq | nyse | hkex | hose) — lowercase.
   const { data, error } = await supabase.rpc('cascade_chairman_event', {
-    tenant_id: tenantId,
-    valuation: parsed.data.valuation,
-    venue: parsed.data.venue,
-    year: parsed.data.year,
-    industry: parsed.data.industry,
-    strategy: parsed.data.strategy,
+    p_tenant_id: tenantId,
+    p_valuation: parsed.data.valuation,
+    p_venue: parsed.data.venue.toLowerCase(),
+    p_year: parsed.data.year,
+    p_industry: parsed.data.industry,
+    p_strategy: parsed.data.strategy,
   })
 
   if (error) {

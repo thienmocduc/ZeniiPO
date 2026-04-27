@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createServerClient } from '@/lib/supabase/server'
+import { emailBillingReceipt } from '@/lib/email/templates'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -65,6 +66,31 @@ export async function POST(req: Request) {
           .from('subscriptions')
           .update({ status: 'canceled', canceled_at: new Date().toISOString() })
           .eq('stripe_subscription_id', sub.id)
+        break
+      }
+      case 'invoice.payment_succeeded': {
+        // Send branded receipt via Resend (no-op if RESEND_API_KEY missing).
+        const inv = event.data.object as Stripe.Invoice
+        const email = inv.customer_email
+        if (email) {
+          const subId = (inv as unknown as { subscription?: string }).subscription
+          let plan = 'subscription'
+          if (subId) {
+            const { data: sub } = await supabase
+              .from('subscriptions')
+              .select('plan, current_period_end')
+              .eq('stripe_subscription_id', subId)
+              .maybeSingle()
+            if (sub?.plan) plan = sub.plan
+          }
+          await emailBillingReceipt({
+            to: email,
+            plan,
+            amount_usd: (inv.amount_paid ?? 0) / 100,
+            period_end: inv.period_end ? new Date(inv.period_end * 1000).toLocaleDateString('vi-VN') : '—',
+            invoice_url: inv.hosted_invoice_url ?? undefined,
+          })
+        }
         break
       }
       default:

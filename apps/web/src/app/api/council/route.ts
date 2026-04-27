@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/api/tenant'
 import { isAnthropicConfigured } from '@/lib/agents/client'
 import { runCouncilValidator } from '@/lib/agents/council-validator'
+import { emailCouncilResult } from '@/lib/email/templates'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -70,6 +71,22 @@ export async function POST(req: Request) {
       },
       cascade_status: 'completed',
     })
+
+    // Email branded summary to the requester (no-op if Resend not configured).
+    if (user.email) {
+      const concerns = (result.votes ?? [])
+        .filter((v) => v.score < 60)
+        .slice(0, 5)
+        .map((v) => `${v.agent}: ${(v.reasoning ?? '').slice(0, 140)}`)
+      const rec = result.recommendation as string
+      await emailCouncilResult({
+        to: user.email,
+        idea_summary: parsed.data.description,
+        overall_score: result.overall_score,
+        recommendation: (rec === 'go' || rec === 'no_go' || rec === 'pivot' || rec === 'hold') ? rec : 'hold',
+        top_concerns: concerns,
+      })
+    }
 
     // Strip internal `_meta` from the public response — keep the type clean.
     const { _meta, ...publicResult } = result
