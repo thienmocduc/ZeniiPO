@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Check, Loader2, X, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { GoogleSignInButton } from '@/components/auth/google-button';
 
 const passwordRules = {
   length: (v: string) => v.length >= 12,
@@ -165,6 +166,13 @@ export default function SignupPage() {
           {authError}
         </div>
       )}
+
+      <GoogleSignInButton label="Đăng ký với Google" />
+      <div className="my-5 flex items-center gap-3">
+        <div className="h-px flex-1 bg-w8" />
+        <span className="font-mono text-2xs uppercase tracking-widest text-ink-dim">hoặc</span>
+        <div className="h-px flex-1 bg-w8" />
+      </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <div>

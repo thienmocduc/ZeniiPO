@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { safeString, safeUuid } from '@/lib/security/schemas'
+import { notifyRoundClosed } from '@/lib/notify/slack'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -67,6 +68,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Slack notification when status flips to 'closed' (no-op if webhook missing).
+  if (parsed.data.status === 'closed' && data) {
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('name')
+      .eq('id', data.tenant_id)
+      .maybeSingle()
+    await notifyRoundClosed({
+      tenant_name: tenant?.name ?? 'Unknown tenant',
+      round_name: data.round_name ?? data.round_code ?? 'Round',
+      amount_usd: Number(data.target_raise_usd ?? data.committed_usd ?? 0),
+      pre_money_usd: data.pre_money_usd ? Number(data.pre_money_usd) : null,
+      post_money_usd: data.post_money_usd ? Number(data.post_money_usd) : null,
+    })
+  }
+
   return NextResponse.json({ data })
 }
 

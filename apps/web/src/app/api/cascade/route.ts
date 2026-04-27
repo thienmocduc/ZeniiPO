@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/api/tenant'
+import { notifyCascadeTriggered } from '@/lib/notify/slack'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -53,6 +54,23 @@ export async function POST(req: Request) {
 
   // RPC may return a single row or an array — normalize either shape.
   const row = Array.isArray(data) ? data[0] : data
+
+  // Slack notification (no-op if SLACK_WEBHOOK_URL missing).
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('name')
+    .eq('id', tenantId)
+    .maybeSingle()
+  await notifyCascadeTriggered({
+    tenant_name: tenant?.name ?? 'Unknown tenant',
+    actor_email: user.email ?? user.id,
+    valuation_usd: parsed.data.valuation,
+    venue: parsed.data.venue,
+    target_year: parsed.data.year,
+    industry: parsed.data.industry,
+    journey_id: row?.journey_id ?? null,
+  })
+
   return NextResponse.json({
     data: {
       event_id: row?.event_id ?? null,

@@ -5,6 +5,7 @@ import { getCurrentTenantId } from '@/lib/api/tenant'
 import { isAnthropicConfigured } from '@/lib/agents/client'
 import { runCouncilValidator } from '@/lib/agents/council-validator'
 import { emailCouncilResult } from '@/lib/email/templates'
+import { notifyCouncilResult } from '@/lib/notify/slack'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -87,6 +88,15 @@ export async function POST(req: Request) {
         top_concerns: concerns,
       })
     }
+    // Slack notification (no-op if webhook URL missing).
+    const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).maybeSingle()
+    await notifyCouncilResult({
+      tenant_name: tenant?.name ?? 'Unknown tenant',
+      actor_email: user.email ?? user.id,
+      overall_score: result.overall_score,
+      recommendation: String(result.recommendation),
+      idea_summary: parsed.data.description,
+    })
 
     // Strip internal `_meta` from the public response — keep the type clean.
     const { _meta, ...publicResult } = result
