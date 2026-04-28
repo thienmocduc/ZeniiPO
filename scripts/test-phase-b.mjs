@@ -10,6 +10,7 @@
  * to verify cross-tenant isolation. Cleans both up at the end.
  */
 import { createClient } from '@supabase/supabase-js'
+import pg from 'pg'
 import dotenv from 'dotenv'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -133,13 +134,31 @@ async function main() {
   ok('User B cookie obtained', cookieB.length > 100, `${cookieB.length} chars`)
 
   // Pre-create a journey for User A so endpoints that need it return data.
-  const { data: profileA } = await ADMIN.from('user_profiles').select('tenant_id').eq('id', userIdA).single()
-  const tenantA = profileA?.tenant_id
-  ok('User A tenant resolved via service role', !!tenantA, tenantA?.slice(0, 8))
-  const cas = await SB.rpc('cascade_chairman_event', {
-    p_tenant_id: tenantA, p_valuation: 5_000_000, p_venue: 'sgx', p_year: 2031, p_industry: 'biotech', p_strategy: 'phase B',
-  })
-  ok('Phase B journey created', !cas.error && cas.data?.status === 'success', cas.error?.message)
+  // Service-role REST is denied by RLS on tenants in this project, so use pg direct.
+  const pgC = new pg.Client({ connectionString: process.env.DATABASE_DIRECT_URL, ssl: { rejectUnauthorized: false } })
+  await pgC.connect()
+  const profileRow = await pgC.query('SELECT tenant_id FROM user_profiles WHERE id=$1', [userIdA])
+  const tenantA = profileRow.rows[0]?.tenant_id
+  ok('User A tenant resolved (pg direct)', !!tenantA, tenantA?.slice(0, 8))
+  // Call cascade RPC directly via pg, wrapped in a transaction so
+  // SET LOCAL claims + role persist across the RPC invocation. is_chr_or_ceo()
+  // reads from request.jwt.claims->>'sub' which only sticks within one txn.
+  try {
+    await pgC.query('BEGIN')
+    await pgC.query(`SELECT set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: userIdA, role: 'authenticated' })])
+    await pgC.query(`SET LOCAL ROLE authenticated`)
+    const cas = await pgC.query(
+      `SELECT public.cascade_chairman_event($1::uuid, $2::numeric, $3::text, $4::int, $5::text, $6::text) AS r`,
+      [tenantA, 5_000_000, 'sgx', 2031, 'biotech', 'phase B test'],
+    )
+    await pgC.query('COMMIT')
+    const result = cas.rows[0]?.r
+    ok('Phase B journey created (pg direct)', result?.status === 'success', `journey=${result?.journey_id?.slice(0, 8)}`)
+  } catch (e) {
+    await pgC.query('ROLLBACK').catch(() => {})
+    ok('Phase B journey created (pg direct)', false, e.message?.slice(0, 100))
+  }
+  await pgC.end()
 
   // ─── 4. GET endpoints with User A auth ─────────────────────
   sec('4. Authenticated GET endpoints')
@@ -160,6 +179,7 @@ async function main() {
   // ─── 5. /api/admin role gate (chairman_super only) ─────────
   sec('5. /api/admin role gate')
   const adminRes = await call('GET', '/api/admin', { cookie: cookieA })
+  await adminRes.text() // consume body — Node fetch keep-alive needs body drained
   ok('GET /api/admin (non-super) → 403', adminRes.status === 403, `status=${adminRes.status}`)
 
   // ─── 6. /api/audit/export role gate ────────────────────────
@@ -167,6 +187,7 @@ async function main() {
   // User A is 'chr' which IS allowed. We assert 200 + CSV.
   const expRes = await call('GET', '/api/audit/export?limit=10', { cookie: cookieA })
   const isCsv = expRes.headers.get('content-type')?.includes('text/csv')
+  await expRes.text() // consume CSV body — without this Node holds the socket and the next POST 401s
   ok('GET /api/audit/export (chr) → CSV', expRes.status === 200 && isCsv, `status=${expRes.status} ct=${expRes.headers.get('content-type')}`)
 
   // ─── 7. POST CRUD endpoints (insert + tenant scope) ────────
@@ -177,11 +198,11 @@ async function main() {
     { path: '/api/market-intel', body: { category: 'competitor', severity: 'watch', title: 'Phase B Test Signal' } },
     { path: '/api/feedback', body: { category: 'feature_request', severity: 'low', title: 'Phase B Test Feedback' } },
     { path: '/api/tokenomics', body: { token_symbol: 'PBT', pool_name: 'Test Pool', allocation_pct: 25 } },
-    { path: '/api/investors', body: { investor_name: 'Phase B VC', stage: 'soft_commit', target_check_usd: 500000 } },
+    { path: '/api/investors', body: { investor_name: 'Phase B VC', stage: 'meeting', priority: 'p2', target_check_usd: 500000 } },
   ]
   const insertedIds = {}
   for (const { path, body } of inserts) {
-    const { status, json } = await callJson('POST', path, { token: cookieA, body })
+    const { status, json } = await callJson('POST', path, { cookie: cookieA, body })
     const inserted = (status === 201 || status === 200) && json?.data?.id
     ok(`POST ${path} → 201`, !!inserted, `status=${status}${json?.error ? ' err=' + JSON.stringify(json.error).slice(0, 80) : ''}`)
     if (inserted) insertedIds[path] = json.data.id
@@ -207,13 +228,13 @@ async function main() {
     { path: '/api/tokenomics', body: { token_symbol: 'X', pool_name: 'Y', allocation_pct: 200 }, name: 'tokenomics · pct >100' },
   ]
   for (const { path, body, name } of badBodies) {
-    const { status } = await callJson('POST', path, { token: cookieA, body })
+    const { status } = await callJson('POST', path, { cookie: cookieA, body })
     ok(`POST ${path} bad body → 400 (${name})`, status === 400, `status=${status}`)
   }
 
   // ─── 10. NLQ guard (no ANTHROPIC key → 503) ───────────────
   sec('10. NLQ guard')
-  const nlqRes = await callJson('POST', '/api/nlq', { token: cookieA, body: { query_text: 'show me top 5 investors by check size' } })
+  const nlqRes = await callJson('POST', '/api/nlq', { cookie: cookieA, body: { query_text: 'show me top 5 investors by check size' } })
   const hasAnthropic = !!process.env.ANTHROPIC_API_KEY
   if (hasAnthropic) {
     ok('POST /api/nlq (with key) → 200/422', [200, 422].includes(nlqRes.status), `status=${nlqRes.status}`)
