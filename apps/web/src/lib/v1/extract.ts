@@ -200,9 +200,14 @@ export function getLoginHtml(): string {
   const src = loadSource();
   const open = src.indexOf('<div class="login" id="login">');
   const end = findMatchingDivEnd(src, open);
-  // Strip inline JS event handlers that reference undefined globals.
-  _loginCache = stripInlineHandlers(src.slice(open, end));
-  return _loginCache;
+  let html = stripInlineHandlers(src.slice(open, end));
+  // Strip the embedded "Z" mark + "Zeniipo IPO Journey Platform v1.7" brand
+  // block at the top of the login card — it duplicates the auth layout chrome
+  // and the chairman flagged it as visually noisy. The block has 3 nested
+  // <div> closes (mark · name+sub wrapper · brand block itself), so we need
+  // three trailing </div> in the pattern.
+  html = html.replace(/<div class="login-brand">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/, '');
+  return (_loginCache = html);
 }
 
 // Strip inline event handler attributes (onclick, onchange, onmouseover, etc.)
