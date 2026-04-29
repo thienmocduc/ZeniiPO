@@ -203,10 +203,12 @@ export function getLoginHtml(): string {
   let html = stripInlineHandlers(src.slice(open, end));
   // Strip the embedded "Z" mark + "Zeniipo IPO Journey Platform v1.7" brand
   // block at the top of the login card — it duplicates the auth layout chrome
-  // and the chairman flagged it as visually noisy. The block has 3 nested
-  // <div> closes (mark · name+sub wrapper · brand block itself), so we need
-  // three trailing </div> in the pattern.
+  // and the chairman flagged it as visually noisy.
   html = html.replace(/<div class="login-brand">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/, '');
+  // Strip pre-filled `value="duc@anima.vn"` and password "Zeniipo@2026" from
+  // the demo seed so the form opens blank like a real login screen.
+  html = html.replace(/(<input[^>]*\bid="loginEmail"[^>]*?)\s+value="[^"]*"/, '$1');
+  html = html.replace(/(<input[^>]*\bid="loginPassword"[^>]*?)\s+value="[^"]*"/, '$1');
   return (_loginCache = html);
 }
 
