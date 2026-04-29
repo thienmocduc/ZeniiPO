@@ -381,12 +381,18 @@ async function main() {
 
   // ─── Security · Auth policies ──────────────────────────────────────
   sec('Security · Auth + rate-limit')
-  const weakPwd = await admin.auth.admin.createUser({
-    email: `weak-${ts}@test.local`,
+  // Note: admin.createUser bypasses password policy by design (legacy import).
+  // Real signup path is auth.signUp with anon key — that is what end-users hit.
+  const anonClient = createClient(SB_URL, SB_ANON)
+  const weakPwd = await anonClient.auth.signUp({
+    email: `weak-${ts}@zeniipo-test.local`,
     password: 'short',
-    email_confirm: true,
   })
-  ok('Weak password rejected (≥12 chars policy)', !!weakPwd.error, weakPwd.error?.message?.substring(0, 80) || 'unexpectedly accepted')
+  ok(
+    'Weak password rejected (≥12 chars policy)',
+    !!weakPwd.error,
+    weakPwd.error?.message?.substring(0, 80) || 'unexpectedly accepted',
+  )
 
   // CSRF — POST without origin
   const csrfRes = await fetch(`${URL}/api/journeys`, {

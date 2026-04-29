@@ -10,6 +10,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { GoogleSignInButton } from '@/components/auth/google-button';
 
 type Props = {
   /** Pre-extracted `<div class="login">` HTML (full wrapper). */
@@ -87,6 +88,9 @@ export function LoginForm({ html }: Props) {
   return (
     <>
       <div ref={rootRef} dangerouslySetInnerHTML={{ __html: html }} />
+      <div style={{ maxWidth: 420, margin: '14px auto 0' }}>
+        <GoogleSignInButton />
+      </div>
       {error && (
         <div
           style={{
