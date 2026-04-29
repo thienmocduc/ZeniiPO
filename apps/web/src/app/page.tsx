@@ -342,13 +342,13 @@ export default function Home() {
             Ra mắt Beta · Apr 2026
           </div>
 
-          <h1 className="hero-h1 font-display font-semibold text-ivory max-w-5xl text-balance">
-            Từ Day-0{' '}
-            <span className="font-serif italic text-gold-light font-normal">
+          <h1 className="hero-h1 font-display font-semibold text-ivory max-w-6xl text-balance">
+            <span className="whitespace-nowrap">Từ Day-0</span>{' '}
+            <span className="whitespace-nowrap font-serif italic text-gold-light font-normal">
               tư tưởng
             </span>{' '}
-            đến ring-bell{' '}
-            <span className="cosmic-gradient-text font-display">SGX 2031</span>.
+            <span className="whitespace-nowrap">đến ring-bell</span>{' '}
+            <span className="whitespace-nowrap cosmic-gradient-text font-display">SGX 2031</span>.
           </h1>
 
           <p className="mt-8 max-w-2xl text-lg md:text-xl text-ink-2 leading-relaxed">
