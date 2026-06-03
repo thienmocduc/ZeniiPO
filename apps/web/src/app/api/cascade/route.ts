@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/api/tenant'
+import { notifyCascadeTriggered } from '@/lib/notify/slack'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -35,13 +36,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No tenant for user' }, { status: 403 })
   }
 
+  // RPC signature: cascade_chairman_event(p_tenant_id, p_valuation, p_venue,
+  //   p_year, p_industry, p_strategy). p_venue must match
+  //   ipo_journeys.exit_venue check (sgx | nasdaq | nyse | hkex | hose) — lowercase.
   const { data, error } = await supabase.rpc('cascade_chairman_event', {
-    tenant_id: tenantId,
-    valuation: parsed.data.valuation,
-    venue: parsed.data.venue,
-    year: parsed.data.year,
-    industry: parsed.data.industry,
-    strategy: parsed.data.strategy,
+    p_tenant_id: tenantId,
+    p_valuation: parsed.data.valuation,
+    p_venue: parsed.data.venue.toLowerCase(),
+    p_year: parsed.data.year,
+    p_industry: parsed.data.industry,
+    p_strategy: parsed.data.strategy,
   })
 
   if (error) {
@@ -50,6 +54,23 @@ export async function POST(req: Request) {
 
   // RPC may return a single row or an array — normalize either shape.
   const row = Array.isArray(data) ? data[0] : data
+
+  // Slack notification (no-op if SLACK_WEBHOOK_URL missing).
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('name')
+    .eq('id', tenantId)
+    .maybeSingle()
+  await notifyCascadeTriggered({
+    tenant_name: tenant?.name ?? 'Unknown tenant',
+    actor_email: user.email ?? user.id,
+    valuation_usd: parsed.data.valuation,
+    venue: parsed.data.venue,
+    target_year: parsed.data.year,
+    industry: parsed.data.industry,
+    journey_id: row?.journey_id ?? null,
+  })
+
   return NextResponse.json({
     data: {
       event_id: row?.event_id ?? null,
