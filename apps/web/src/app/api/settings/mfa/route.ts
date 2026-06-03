@@ -31,12 +31,15 @@ const VerifySchema = z.object({
   code: z.string().regex(/^\d{6}$/, 'Code phải là 6 chữ số'),
 })
 export async function PATCH(req: Request) {
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await req.json().catch(() => ({}))
   const parsed = VerifySchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
-  const supabase = await createServerClient()
   const challenge = await supabase.auth.mfa.challenge({ factorId: parsed.data.factor_id })
   if (challenge.error) return NextResponse.json({ error: challenge.error.message }, { status: 400 })
   const verify = await supabase.auth.mfa.verify({
@@ -51,12 +54,15 @@ export async function PATCH(req: Request) {
 // DELETE: unenroll a factor.
 const UnenrollSchema = z.object({ factor_id: z.string().uuid() })
 export async function DELETE(req: Request) {
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await req.json().catch(() => ({}))
   const parsed = UnenrollSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
-  const supabase = await createServerClient()
   const { data, error } = await supabase.auth.mfa.unenroll({ factorId: parsed.data.factor_id })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })

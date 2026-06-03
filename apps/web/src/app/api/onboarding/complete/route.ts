@@ -29,16 +29,18 @@ const Schema = z.object({
 })
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}))
-  const parsed = Schema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-  }
-
+  // Auth gate FIRST (defence-in-depth) — never reveal schema shape to
+  // unauthenticated callers. CSRF + rate-limit have already run in middleware.
   const supabase = await createServerClient()
   const auth = await requireUserAndTenant(supabase)
   if (!auth.ok) {
     return NextResponse.json({ error: auth.message }, { status: auth.status })
+  }
+
+  const body = await req.json().catch(() => ({}))
+  const parsed = Schema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
   const p = parsed.data
@@ -88,6 +90,7 @@ export async function POST(req: Request) {
 
   // Step 3: 1 OKR Chairman (link to existing CHR objectives if cascade created any).
   // We append a new "user-defined" CHR objective alongside the 4 cascade-default ones.
+  // Schema uses owner_id (not created_by) — the latter doesn't exist on okr_objectives.
   const okrRes = await supabase
     .from('okr_objectives')
     .insert({
@@ -95,7 +98,8 @@ export async function POST(req: Request) {
       title: p.okr_title,
       description: p.okr_description ?? null,
       tier: 'chr',
-      created_by: auth.user.id,
+      owner_id: auth.user.id,
+      journey_id: journeyId ?? null,
     })
     .select('id, title')
     .single()

@@ -11,15 +11,16 @@ const Schema = z.object({
 })
 
 export async function POST(req: Request) {
+  // Auth gate FIRST (defence-in-depth) — never reveal schema to anonymous callers.
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await req.json().catch(() => ({}))
   const parsed = Schema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
-
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Re-authenticate with current password (Supabase requires this for sensitive update).
   const reauth = await supabase.auth.signInWithPassword({

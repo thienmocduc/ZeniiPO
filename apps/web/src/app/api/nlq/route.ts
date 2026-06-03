@@ -32,6 +32,11 @@ const PostSchema = z.object({
 })
 
 export async function POST(req: Request) {
+  // Auth FIRST — never reveal service config to anonymous callers.
+  const supabase = await createServerClient()
+  const auth = await requireUserAndTenant(supabase)
+  if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status })
+
   if (!isAnthropicConfigured()) {
     return NextResponse.json(
       { error: 'NLQ unavailable — ANTHROPIC_API_KEY not configured' },
@@ -44,10 +49,6 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
-
-  const supabase = await createServerClient()
-  const auth = await requireUserAndTenant(supabase)
-  if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status })
 
   const startedAt = Date.now()
   const nlq = await parseNlqQuery(parsed.data.query_text)

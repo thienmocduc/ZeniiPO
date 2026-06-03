@@ -10,23 +10,25 @@ const Schema = z.object({
 })
 
 export async function POST(req: Request) {
+  // Auth gate FIRST.
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await req.json().catch(() => ({}))
   const parsed = Schema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const upd = await supabase.auth.updateUser({ email: parsed.data.new_email })
   if (upd.error) {
     return NextResponse.json({ error: upd.error.message }, { status: 400 })
   }
-  // Supabase sends confirmation email to BOTH old + new. User must click both links.
   return NextResponse.json({
     data: {
       ok: true,
+      // Supabase sends confirm to BOTH old + new — user clicks both links.
       message: 'Confirm link đã gửi tới cả email cũ và mới. Click cả 2 link để hoàn tất đổi.',
     },
   })
