@@ -336,8 +336,9 @@ export function rewriteSidebarForNextLinks(inner: string): string {
     },
   );
   // Inject the new operating-system pages (no entry in v1 source.html) right
-  // after Dashboard: the 7-chakra spine + the spec's core capabilities.
+  // after Dashboard: Command Cockpit (unified) + the 7-chakra spine + core caps.
   const newLinks = [
+    { route: 'cockpit', page: 'cockpit', ic: '◉', tx: 'Command Cockpit', pill: '<span class="pill new">LIVE</span>' },
     { route: 'journey', page: 'journey', ic: '✦', tx: 'Hành trình 7 tầng', pill: '<span class="pill new">CORE</span>' },
     { route: 'financial-model', page: 'finmodel', ic: '∿', tx: 'Financial Model', pill: '<span class="pill">MC</span>' },
     { route: 'certificates', page: 'certs', ic: '🎓', tx: 'Chứng nhận', pill: '' },
