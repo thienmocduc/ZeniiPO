@@ -51,5 +51,11 @@ export async function POST(req: Request) {
     p_deliverable: parsed.data.deliverable ?? null,
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // If this advance unlocked the level, mint any newly-earned certificates
+  // (idempotent — issues per-level + master when 7/7).
+  if ((data as { can_unlock?: boolean } | null)?.can_unlock) {
+    await supabase.rpc('issue_certificates', { p_tenant_id: auth.tenantId })
+  }
   return NextResponse.json({ data })
 }
