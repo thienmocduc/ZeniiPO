@@ -10,7 +10,7 @@ test.describe('Anima Chairman · authenticated flow', () => {
     await page.locator('input[type="password"]').first().fill(ANIMA_PASS)
     await Promise.all([
       page.waitForURL(/\/(onboarding|dashboard)/, { timeout: 15000 }),
-      page.locator('button[type="submit"]').first().click(),
+      page.locator('#loginBtn, button:has-text("Đăng nhập")').first().click(),
     ])
     const url = page.url()
     expect(url).toMatch(/\/(onboarding|dashboard)/)
@@ -21,13 +21,13 @@ test.describe('Anima Chairman · authenticated flow', () => {
     await page.goto('/login')
     await page.locator('input[type="email"]').first().fill(ANIMA_EMAIL)
     await page.locator('input[type="password"]').first().fill(ANIMA_PASS)
-    await page.locator('button[type="submit"]').first().click()
+    await page.locator('#loginBtn, button:has-text("Đăng nhập")').first().click()
     await page.waitForURL(/\/(onboarding|dashboard)/, { timeout: 15000 })
     // If onboarding, can't reach settings-security yet — skip.
     if (page.url().includes('/onboarding')) test.skip(true, 'Tenant not onboarded yet')
     await page.goto('/settings-security')
-    await expect(page.getByText(/đổi mật khẩu/i)).toBeVisible()
-    await expect(page.getByText(/đổi email/i)).toBeVisible()
-    await expect(page.getByText(/xác thực 2 bước/i)).toBeVisible()
+    await expect(page.locator('h2', { hasText: 'Đổi mật khẩu' }).first()).toBeVisible()
+    await expect(page.locator('h2', { hasText: 'Đổi email' }).first()).toBeVisible()
+    await expect(page.locator('h2', { hasText: 'Xác thực 2 bước' }).first()).toBeVisible()
   })
 })

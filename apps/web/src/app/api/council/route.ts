@@ -27,6 +27,18 @@ const CouncilSchema = z.object({
  * to `events` as `event_type = 'council_validation'` for audit + replay.
  */
 export async function POST(req: Request) {
+  // Auth FIRST — never reveal service config to anonymous callers.
+  const supabase = await createServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const tenantId = await getCurrentTenantId(supabase, user.id)
+  if (!tenantId) {
+    return NextResponse.json({ error: 'No tenant for user' }, { status: 403 })
+  }
+
   if (!isAnthropicConfigured()) {
     return NextResponse.json(
       { error: 'Service unavailable — AI agents disabled (ANTHROPIC_API_KEY not set)' },
@@ -38,17 +50,6 @@ export async function POST(req: Request) {
   const parsed = CouncilSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-  }
-
-  const supabase = await createServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const tenantId = await getCurrentTenantId(supabase, user.id)
-  if (!tenantId) {
-    return NextResponse.json({ error: 'No tenant for user' }, { status: 403 })
   }
 
   try {

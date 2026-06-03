@@ -10,9 +10,9 @@ test.describe('Smoke · public surface', () => {
 
   test('login page renders with email + password fields', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('textbox', { name: /email/i }).first()).toBeVisible()
-    // Password input is type=password — match by selector
-    await expect(page.locator('input[type="password"]').first()).toBeVisible()
+    // V1 login form uses #loginEmail / #loginPassword (no aria roles set).
+    await expect(page.locator('#loginEmail, input[type="email"]').first()).toBeVisible()
+    await expect(page.locator('#loginPassword, input[type="password"]').first()).toBeVisible()
   })
 
   test('signup page renders', async ({ page }) => {
