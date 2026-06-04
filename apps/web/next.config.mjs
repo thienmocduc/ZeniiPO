@@ -1,7 +1,18 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Container deploy on ZeniCloud Compute (Cloud Run): emit a self-contained
+  // standalone server (.next/standalone/server.js) so the Docker image is tiny
+  // and does not need the full node_modules at runtime.
+  output: 'standalone',
+  // Monorepo: trace from the repo root so workspace deps are bundled correctly.
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
