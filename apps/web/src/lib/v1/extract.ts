@@ -335,16 +335,21 @@ export function rewriteSidebarForNextLinks(inner: string): string {
       return `<a class="${cls}" data-page="${pageId}" data-route="/${route}" href="/${route}"${rest}>${body}</a>`;
     },
   );
-  // Inject the Journey Engine link (the 7-chakra spine) right after Dashboard.
-  // It has no entry in v1 source.html — it's the new operating-system spine.
-  const journeyLink =
-    '<a class="nav-it" data-page="journey" data-route="/journey" href="/journey">' +
-    '<span class="ic">✦</span><span class="tx">Hành trình 7 tầng</span>' +
-    '<span class="pill new">CORE</span></a>';
-  out = out.replace(
-    /(<a class="nav-it act" data-page="dash"[\s\S]*?<\/a>)/,
-    `$1${journeyLink}`,
-  );
+  // Inject the new operating-system pages (no entry in v1 source.html) right
+  // after Dashboard: Command Cockpit (unified) + the 7-chakra spine + core caps.
+  const newLinks = [
+    { route: 'cockpit', page: 'cockpit', ic: '◉', tx: 'Command Cockpit', pill: '<span class="pill new">LIVE</span>' },
+    { route: 'journey', page: 'journey', ic: '✦', tx: 'Hành trình 7 tầng', pill: '<span class="pill new">CORE</span>' },
+    { route: 'financial-model', page: 'finmodel', ic: '∿', tx: 'Financial Model', pill: '<span class="pill">MC</span>' },
+    { route: 'certificates', page: 'certs', ic: '🎓', tx: 'Chứng nhận', pill: '' },
+  ]
+    .map(
+      (l) =>
+        `<a class="nav-it" data-page="${l.page}" data-route="/${l.route}" href="/${l.route}">` +
+        `<span class="ic">${l.ic}</span><span class="tx">${l.tx}</span>${l.pill}</a>`,
+    )
+    .join('');
+  out = out.replace(/(<a class="nav-it act" data-page="dash"[\s\S]*?<\/a>)/, `$1${newLinks}`);
   return out;
 }
 
