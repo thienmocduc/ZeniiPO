@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 import { V1Modals } from '@/components/v1-modals';
 import { V1Interactivity } from '@/components/v1-interactivity';
+import { IdentityBind } from '@/components/identity-bind';
 import {
   getSidebarInner,
   rewriteSidebarForNextLinks,
@@ -40,8 +41,13 @@ export default async function AppLayout({
     if ((count ?? 0) === 0) redirect('/onboarding');
   }
 
+  // Chairman-super sees the Zeni Console nav link (platform operator + holdings).
+  const { data: isSuper } = await supabase.rpc('is_chairman_super');
+
   // Pull sidebar markup from v1_8 source and rewire <div data-page> → <a href="/route">
-  const sidebarHtml = rewriteSidebarForNextLinks(getSidebarInner());
+  const sidebarHtml = rewriteSidebarForNextLinks(getSidebarInner(), {
+    showConsole: Boolean(isSuper),
+  });
   // Pull the v1_8 inline <script> block — V1Interactivity executes it once
   // on mount so role switcher, agent modals, drills, command palette,
   // knowledge panels, cascade input, etc. all work.
@@ -58,6 +64,8 @@ export default async function AppLayout({
       <V1Modals />
       {/* Wires up every onclick handler + global function exposed by v1_8 */}
       <V1Interactivity script={script} />
+      {/* Patch topbar identity chips with the real logged-in user + tenant */}
+      <IdentityBind />
     </>
   );
 }
