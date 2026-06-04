@@ -211,7 +211,7 @@ const stClass = (s: string) => STATUS_CLASS[String(s).toLowerCase()] ?? 'dim'
 // ─────────────────────────────────────────────────────────────
 
 const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
-  'page-dash': (raw) => {
+  'page-dash': async (raw) => {
     const root = document.getElementById('page-dash')
     if (!root) return
     const d = (raw?.data ?? raw) as Record<string, unknown>
@@ -261,6 +261,28 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
         ).join('')
       }
     }
+
+    // OKR Focus — replace the static demo (ANIMA) tree with this tenant's real OKRs.
+    try {
+      const okrRes = await fetch('/api/okrs', { credentials: 'same-origin' })
+      if (okrRes.ok) {
+        const oj = (await okrRes.json()) as { data?: Array<{ id: string; title: string; tier?: string; description?: string }>; tree?: { roots: OkrNode[]; byParent: Record<string, OkrNode[]> } }
+        const list = oj?.data ?? []
+        const tree = oj?.tree
+        const tag = root.querySelector<HTMLElement>('#okrFocusTag')
+        if (tag) tag.textContent = `LIVE · ${list.length} O`
+        const focus = root.querySelector<HTMLElement>('#okrFocus')
+        if (focus) {
+          if (list.length === 0) {
+            focus.innerHTML = `<div style="padding:20px;color:var(--dim);text-align:center;font-size:.82rem">Chưa có OKR. Tạo OKR đầu tiên ở /okrs.</div>`
+          } else if (tree?.roots) {
+            focus.innerHTML = tree.roots.map((r) => renderOkrNode(r, tree.byParent ?? {}, 0)).join('')
+          } else {
+            focus.innerHTML = list.map((o) => `<div class="okr-node"><div class="okr-h"><b>${escapeHtml(o.title)}</b>${o.tier ? `<span class="tag">${escapeHtml(o.tier.toUpperCase())}</span>` : ''}</div></div>`).join('')
+          }
+        }
+      }
+    } catch { /* leave static markup intact */ }
   },
 
   'page-okr': (raw) => {

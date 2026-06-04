@@ -13,6 +13,7 @@ const PROTECTED_PREFIXES = [
   '/financials',
   '/cap-table',
   '/admin',
+  '/console',
   '/settings',
   '/academy',
   '/ipo-execution',
