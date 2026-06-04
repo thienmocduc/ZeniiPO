@@ -8,6 +8,9 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
  * Always includes zeniipo.com + www + Vercel preview alias.
  */
 const BUILTIN_TRUSTED = [
+  'https://zenicloud.io',
+  'https://www.zenicloud.io',
+  // Legacy domain kept during transition + Vercel preview alias.
   'https://zeniipo.com',
   'https://www.zeniipo.com',
   'https://zeniipo.vercel.app',
@@ -22,12 +25,16 @@ function getTrustedOrigins(): string[] {
   return Array.from(new Set([...BUILTIN_TRUSTED, ...envTrusted]))
 }
 
-/** Allow any subdomain of zeniipo.com (e.g. app.zeniipo.com, academy.zeniipo.com). */
-function isZeniipoSubdomain(origin: string): boolean {
+/** Allow any subdomain of zenicloud.io / zeniipo.com (e.g. app.zenicloud.io, academy.zenicloud.io). */
+function isTrustedSubdomain(origin: string): boolean {
   try {
     const url = new URL(origin)
     if (url.protocol !== 'https:') return false
-    return url.host === 'zeniipo.com' || url.host.endsWith('.zeniipo.com')
+    const h = url.host
+    return (
+      h === 'zenicloud.io' || h.endsWith('.zenicloud.io') ||
+      h === 'zeniipo.com' || h.endsWith('.zeniipo.com')
+    )
   } catch {
     return false
   }
@@ -76,8 +83,8 @@ export function validateCsrf(req: NextRequest): boolean {
   const trusted = getTrustedOrigins()
   if (trusted.includes(origin)) return true
 
-  // Any HTTPS subdomain of zeniipo.com is trusted
-  if (isZeniipoSubdomain(origin)) return true
+  // Any HTTPS subdomain of zenicloud.io / zeniipo.com is trusted
+  if (isTrustedSubdomain(origin)) return true
 
   return false
 }

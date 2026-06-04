@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://zeniipo.com'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://zenicloud.io'
   const now = new Date()
   return [
     { url: `${base}/`, lastModified: now, changeFrequency: 'daily', priority: 1 },

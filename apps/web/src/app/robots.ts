@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 
 export default function robots(): MetadataRoute.Robots {
-  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://zeniipo.com'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://zenicloud.io'
   return {
     rules: [
       {
@@ -10,6 +10,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           '/api/',
           '/admin/',
+          '/console/',
           '/dashboard/',
           '/academy/handbook/',
           '/cap-table/',
