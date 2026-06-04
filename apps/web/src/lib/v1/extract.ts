@@ -324,7 +324,10 @@ export const ROUTE_MAP: Record<string, string> = {
 // component after it dangerously injects innerHTML (we pre-transform here
 // instead of rewiring via JS listeners).
 // ─────────────────────────────────────────────────────────────
-export function rewriteSidebarForNextLinks(inner: string): string {
+export function rewriteSidebarForNextLinks(
+  inner: string,
+  opts?: { showConsole?: boolean },
+): string {
   let out = inner;
   // Replace nav-it divs with <a> tags pointing at routes.
   out = out.replace(
@@ -338,6 +341,10 @@ export function rewriteSidebarForNextLinks(inner: string): string {
   // Inject the new operating-system pages (no entry in v1 source.html) right
   // after Dashboard: Command Cockpit (unified) + the 7-chakra spine + core caps.
   const newLinks = [
+    // Zeni Console — platform operator + holdings cockpit. Chairman-super only.
+    ...(opts?.showConsole
+      ? [{ route: 'console', page: 'console', ic: '⬡', tx: 'Zeni Console', pill: '<span class="pill new">ADMIN</span>' }]
+      : []),
     { route: 'cockpit', page: 'cockpit', ic: '◉', tx: 'Command Cockpit', pill: '<span class="pill new">LIVE</span>' },
     { route: 'journey', page: 'journey', ic: '✦', tx: 'Hành trình 7 tầng', pill: '<span class="pill new">CORE</span>' },
     { route: 'financial-model', page: 'finmodel', ic: '∿', tx: 'Financial Model', pill: '<span class="pill">MC</span>' },
