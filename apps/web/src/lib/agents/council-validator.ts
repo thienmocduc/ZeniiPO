@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, getAnthropicClient } from './client'
+import { DEFAULT_MODEL, chatComplete } from './client'
 import { computeCost } from './cost'
 import type { CouncilResult, CouncilVote } from './types'
 
@@ -138,27 +138,14 @@ function isCouncilResult(value: unknown): value is CouncilResult {
 async function callCouncil(
   idea: CouncilIdea,
 ): Promise<{ raw: string; inputTokens: number; outputTokens: number }> {
-  const client = getAnthropicClient()
-  const userPrompt = buildUserPrompt(idea)
-
-  const message = await client.messages.create({
-    model: DEFAULT_MODEL,
-    max_tokens: 2048,
+  const r = await chatComplete({
     system: COUNCIL_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
+    user: buildUserPrompt(idea),
+    model: DEFAULT_MODEL,
+    maxTokens: 4096, // 9 detailed votes + summary — DeepSeek is verbose; 2048 truncated the JSON
+    temperature: 0.4,
   })
-
-  // Concatenate all text blocks (usually one, but guard against future shapes).
-  const raw = message.content
-    .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
-    .map((block) => block.text)
-    .join('')
-
-  return {
-    raw,
-    inputTokens: message.usage?.input_tokens ?? 0,
-    outputTokens: message.usage?.output_tokens ?? 0,
-  }
+  return { raw: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens }
 }
 
 /**
@@ -187,10 +174,8 @@ export async function runCouncilValidator(
       if (!isCouncilResult(parsed)) {
         throw new Error('Council response did not match schema')
       }
-      const cost = computeCost(
-        { input: totalInput, output: totalOutput },
-        DEFAULT_MODEL,
-      )
+      let cost = 0
+      try { cost = computeCost({ input: totalInput, output: totalOutput }, DEFAULT_MODEL) } catch { /* unknown model pricing */ }
       return {
         ...parsed,
         _meta: {

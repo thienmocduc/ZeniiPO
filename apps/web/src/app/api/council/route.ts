@@ -21,6 +21,27 @@ const CouncilSchema = z.object({
 })
 
 /**
+ * GET /api/council — list past council validations (tenant-scoped via RLS) so
+ * the page can show history + KPI counts. Also reports whether AI is enabled.
+ */
+export async function GET() {
+  const supabase = await createServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data, error } = await supabase
+    .from('events')
+    .select('id, payload, cascade_status, created_at')
+    .eq('event_type', 'council_validation')
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ data: data ?? [], ai_enabled: isAnthropicConfigured() })
+}
+
+/**
  * POST /api/council
  *
  * Runs the Council of 9 validator on a business idea and persists the result
