@@ -1,5 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
-import { DEFAULT_MODEL, FAST_MODEL, getAnthropicClient } from './client'
+import { DEFAULT_MODEL, FAST_MODEL, chatComplete } from './client'
 import { computeCost } from './cost'
 import type { AgentCatalogRow, AgentRunInput, AgentRunOutput } from './types'
 
@@ -29,7 +30,7 @@ function pickModel(mode: AgentRunInput['mode']): string {
   return DEFAULT_MODEL
 }
 
-function buildSystemPrompt(agent: AgentCatalogRow): string {
+export function buildSystemPrompt(agent: AgentCatalogRow): string {
   const chiefNote = agent.is_chief
     ? `You are the CHIEF agent for the ${agent.department} department — you lead the nine-agent department squad.\n`
     : ''
@@ -53,11 +54,14 @@ function buildUserPrompt(input: AgentRunInput): string {
 /**
  * Fetches catalog metadata for an agent. Accepts either the `agent_code`
  * string (e.g. `fin-01-plutus`) — this is what the catalog exposes.
+ * Pass `sb` (e.g. the service client) in contexts without request cookies
+ * (cron engine); defaults to the SSR client for route handlers.
  */
-async function loadAgentFromCatalog(
+export async function loadAgentFromCatalog(
   agentCode: string,
+  sb?: SupabaseClient,
 ): Promise<AgentCatalogRow> {
-  const supabase = await createServerClient()
+  const supabase = sb ?? (await createServerClient())
   const { data, error } = await supabase
     .from('agent_catalog')
     .select(
@@ -89,30 +93,24 @@ export async function runAgent(
   const started = Date.now()
   const agent = await loadAgentFromCatalog(agentCode)
 
-  const client = getAnthropicClient()
   const model = pickModel(input.mode)
 
-  const message = await client.messages.create({
-    model,
-    max_tokens: input.mode === 'fast' ? 1024 : 2048,
+  const r = await chatComplete({
     system: buildSystemPrompt(agent),
-    messages: [{ role: 'user', content: buildUserPrompt(input) }],
+    user: buildUserPrompt(input),
+    model,
+    maxTokens: input.mode === 'fast' ? 1024 : 2048,
   })
 
-  const text = message.content
-    .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
-    .map((block) => block.text)
-    .join('')
-
-  const tokens = {
-    input: message.usage?.input_tokens ?? 0,
-    output: message.usage?.output_tokens ?? 0,
-  }
+  const text = r.text
+  const tokens = { input: r.inputTokens, output: r.outputTokens }
+  let cost_usd = 0
+  try { cost_usd = computeCost(tokens, model) } catch { /* unknown model pricing */ }
 
   return {
     text,
     tokens,
-    cost_usd: computeCost(tokens, model),
+    cost_usd,
     duration_ms: Date.now() - started,
   }
 }

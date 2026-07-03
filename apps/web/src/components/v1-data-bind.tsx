@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { openFormModal, apiSend, toast, num, wireButtonByText, wireEach, type Field } from '@/components/v1-actions'
 
 type Json = Record<string, unknown> | null
 
@@ -457,15 +458,100 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-agents': (raw) => {
     const root = document.getElementById('page-agents')
     if (!root) return
-    const d = raw as { data?: Array<{ user_id: string; role?: string }> }
-    const profiles = d?.data ?? []
-    const cards = root.querySelectorAll<HTMLElement>('.kpi-row .kpi-card .kpi-v')
-    if (cards.length >= 4) cards[0].innerHTML = `${profiles.length}<em>/108</em>`
-    const subs = root.querySelectorAll<HTMLElement>('.kpi-row .kpi-card .kpi-chg')
-    if (subs.length >= 1) {
-      const pct = Math.round((profiles.length / 108) * 100)
-      subs[0].textContent = `Phase 1 · ${pct}%`
+    type ActionRow = {
+      id: string
+      agent_code: string
+      action_type: string
+      title: string
+      confidence?: number
     }
+    type Payload = {
+      data?: {
+        configured?: Array<{ agent_code?: string; status?: string }>
+        catalog?: Array<{ agent_code: string }>
+        engine?: {
+          schedules?: Array<{ agent_code: string; cadence?: string; autonomy?: string; enabled?: boolean }>
+          actions_pending?: ActionRow[]
+          runs_recent?: Array<{ id: string; status?: string; cost_usd?: number }>
+        }
+      }
+    }
+    const TYPE_LABEL: Record<string, string> = {
+      create_task: '📋 Tạo task',
+      upsert_kpi: '📈 Ghi KPI',
+      raise_alert: '🚨 Cảnh báo',
+      log_insight: '💡 Insight',
+    }
+    const render = (p: Payload) => {
+      const configured = p?.data?.configured ?? []
+      const catalog = p?.data?.catalog ?? []
+      const eng = p?.data?.engine ?? {}
+      const scheds = eng.schedules ?? []
+      const pending = eng.actions_pending ?? []
+      const runs = eng.runs_recent ?? []
+      const autoOn = scheds.filter((s) => s.enabled).length
+
+      patchKpiCards(root, [
+        { value: `${configured.length}<em>/${catalog.length || 108}</em>`, label: 'Agents active' },
+        { value: String(autoOn), label: 'Lịch tự động ON', sub: scheds.length ? `${scheds.filter((s) => s.autonomy === 'auto').length} full-auto · còn lại chờ duyệt` : 'Engine tick 15ph — chưa có lịch' },
+        { value: String(runs.length), label: 'Runs gần nhất', sub: runs.length ? `chi phí ~$${runs.reduce((a, r) => a + (Number(r.cost_usd) || 0), 0).toFixed(3)}` : 'chưa chạy' },
+        { value: String(pending.length), label: 'Actions chờ duyệt', sub: pending.length ? 'duyệt bên dưới ⬇' : 'sạch hàng đợi' },
+      ])
+
+      // Inject (or refresh) the approval-queue panel above the dept grid.
+      let panel = root.querySelector<HTMLElement>('#agent-actions-panel')
+      if (!panel) {
+        panel = document.createElement('div')
+        panel.id = 'agent-actions-panel'
+        panel.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02))'
+        const grid = root.querySelector('.agent-g')
+        if (grid?.parentNode) grid.parentNode.insertBefore(panel, grid)
+        else root.appendChild(panel)
+      }
+      const rowsHtml = pending
+        .map((a) => {
+          const conf = typeof a.confidence === 'number' ? `${Math.round(a.confidence * 100)}%` : '—'
+          return `<tr>
+            <td><span style="font-family:monospace;font-size:.75rem;color:var(--dim)">${escapeHtml(a.agent_code)}</span></td>
+            <td>${TYPE_LABEL[a.action_type] ?? escapeHtml(a.action_type)}</td>
+            <td><strong>${escapeHtml(a.title)}</strong></td>
+            <td class="num">${conf}</td>
+            <td style="white-space:nowrap">
+              <button data-approve="${a.id}" style="background:var(--ok,#22c55e);color:#08130b;border:0;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:700">✓ Duyệt</button>
+              <button data-reject="${a.id}" style="background:none;border:1px solid var(--line,#2a2a3f);color:var(--dim);border-radius:6px;padding:4px 10px;cursor:pointer;margin-left:6px">✕ Từ chối</button>
+            </td>
+          </tr>`
+        })
+        .join('')
+      panel.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <strong>⚡ Hành động supagent chờ duyệt (${pending.length})</strong>
+          <span style="font-size:.75rem;color:var(--dim)">Engine tự chạy 12 chief theo lịch · duyệt 1-click để thực thi</span>
+        </div>
+        ${
+          pending.length === 0
+            ? `<div style="color:var(--dim);font-style:italic;padding:8px 0">Không có đề xuất chờ duyệt. Supagents sẽ đề xuất sau chu kỳ chạy kế tiếp.</div>`
+            : `<div style="overflow-x:auto"><table class="tbl" style="width:100%"><thead><tr><th>Agent</th><th>Loại</th><th>Đề xuất</th><th>Tin cậy</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`
+        }`
+
+      wireEach(panel, 'button[data-approve]', async (el) => {
+        const id = el.getAttribute('data-approve')
+        if (!id) return
+        const r = await apiSend('/api/agents/actions', 'PATCH', { id, decision: 'approve' })
+        if (r.ok) { toast('Đã thực thi ✓'); void refresh() } else toast(r.error ?? 'Lỗi duyệt', 'err')
+      })
+      wireEach(panel, 'button[data-reject]', async (el) => {
+        const id = el.getAttribute('data-reject')
+        if (!id) return
+        const r = await apiSend('/api/agents/actions', 'PATCH', { id, decision: 'reject' })
+        if (r.ok) { toast('Đã từ chối'); void refresh() } else toast(r.error ?? 'Lỗi', 'err')
+      })
+    }
+    const refresh = async () => {
+      const r = await apiSend('/api/agents', 'GET')
+      if (r.ok) render({ data: r.data } as Payload)
+    }
+    render(raw as Payload)
   },
 
   // ─────────────────────────────────────────────────────────────
@@ -499,15 +585,40 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-kpi': (raw) => {
     const root = document.getElementById('page-kpi')
     if (!root) return
-    const list = ((raw as { data?: Array<{ name: string; value: number; unit?: string; period?: string; trend?: string; category?: string }> })?.data) ?? []
-    patchKpiCards(root, [
-      { value: String(list.length), label: 'KPI tracked' },
-      { value: String(new Set(list.map((k) => k.category ?? 'misc')).size), label: 'Categories' },
-      { value: String(list.filter((k) => k.trend === 'up').length), label: 'Trending up' },
-      { value: String(list.filter((k) => k.trend === 'down').length), label: 'Need attention' },
-    ])
-    const rows = list.slice(0, 30).map((k) => `<tr><td><strong>${escapeHtml(k.name)}</strong></td><td>${escapeHtml(k.category ?? '—')}</td><td class="num">${fmtNum(k.value)} ${escapeHtml(k.unit ?? '')}</td><td>${escapeHtml(k.period ?? '—')}</td><td><span class="st ${k.trend === 'up' ? 'ok' : k.trend === 'down' ? 'err' : 'dim'}">${escapeHtml(k.trend ?? '—')}</span></td></tr>`)
-    patchTable(root, '.card', rows, 'Chưa có KPI. Bấm "+ KPI mới" hoặc POST /api/kpis để thêm.', 5)
+    type Kpi = { id: string; metric_code?: string; name: string; value: number; unit?: string; period?: string; trend?: string; category?: string }
+    const render = (list: Kpi[]) => {
+      patchKpiCards(root, [
+        { value: String(list.length), label: 'KPI tracked' },
+        { value: String(new Set(list.map((k) => k.category ?? 'misc')).size), label: 'Categories' },
+        { value: String(list.filter((k) => k.trend === 'up').length), label: 'Trending up' },
+        { value: String(list.filter((k) => k.trend === 'down').length), label: 'Need attention' },
+      ])
+      const rows = list.slice(0, 60).map((k) => `<tr><td><strong>${escapeHtml(k.name)}</strong><button data-del="${k.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(k.category ?? '—')}</td><td class="num">${fmtNum(k.value)} ${escapeHtml(k.unit ?? '')}</td><td>${escapeHtml(k.period ?? '—')}</td><td><span class="st ${k.trend === 'up' ? 'ok' : k.trend === 'down' ? 'err' : 'dim'}">${escapeHtml(k.trend ?? '—')}</span></td></tr>`)
+      patchTable(root, '.card', rows, 'Chưa có KPI. Bấm "+ KPI mới" để thêm.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá KPI này?')) return
+        const r = await apiSend(`/api/kpis/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/kpis', 'GET'); if (r.ok) render((r.data as Kpi[]) ?? []) }
+    render(((raw as { data?: Kpi[] })?.data) ?? [])
+    wireButtonByText(root, 'KPI mới', async () => {
+      const v = await openFormModal({
+        title: 'Thêm KPI', submitLabel: 'Thêm', fields: [
+          { name: 'name', label: 'Tên KPI', required: true, placeholder: 'MRR' },
+          { name: 'metric_code', label: 'Mã (code)', required: true, placeholder: 'mrr' },
+          { name: 'value', label: 'Giá trị', type: 'number', required: true },
+          { name: 'unit', label: 'Đơn vị', placeholder: 'USD' },
+          { name: 'period', label: 'Kỳ', placeholder: '2026-06' },
+          { name: 'trend', label: 'Xu hướng', type: 'select', options: [{ value: '', label: '—' }, { value: 'up', label: 'up' }, { value: 'flat', label: 'flat' }, { value: 'down', label: 'down' }] },
+        ],
+      })
+      if (!v) return
+      const res = await apiSend('/api/kpis', 'POST', { name: v.name, metric_code: v.metric_code, value: num(v.value) ?? 0, unit: v.unit || undefined, period: v.period || undefined, trend: v.trend || undefined })
+      if (res.ok) { toast('Đã thêm KPI'); void refresh() } else toast(res.error ?? 'Lỗi thêm', 'err')
+    })
   },
 
   'page-schema': (raw) => {
@@ -831,16 +942,45 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-comparables': (raw) => {
     const root = document.getElementById('page-comparables')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; company_name: string; ticker?: string; ev_revenue_multiple?: number; ev_ebitda_multiple?: number; pe_ratio?: number; growth_rate_pct?: number }> })?.data) ?? []
-    const avgEvRev = list.length ? list.reduce((a, c) => a + (c.ev_revenue_multiple ?? 0), 0) / list.length : 0
-    patchKpiCards(root, [
-      { value: String(list.length), label: 'Comp companies' },
-      { value: avgEvRev ? `${avgEvRev.toFixed(1)}×` : '—', label: 'Avg EV/Rev' },
-      { value: '—', label: 'Median P/E' },
-      { value: '—', label: 'Industry' },
-    ])
-    const rows = list.slice(0, 20).map((c) => `<tr><td><strong>${escapeHtml(c.company_name)}</strong>${c.ticker ? `<br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(c.ticker)}</span>` : ''}</td><td class="num">${c.ev_revenue_multiple?.toFixed(1) ?? '—'}×</td><td class="num">${c.ev_ebitda_multiple?.toFixed(1) ?? '—'}×</td><td class="num">${c.pe_ratio?.toFixed(1) ?? '—'}</td><td class="num">${c.growth_rate_pct?.toFixed(1) ?? '—'}%</td></tr>`)
-    patchTable(root, '.card', rows, 'Chưa có comp. Bấm "+ Add comparable" để thêm peer company.', 5)
+    type Comp = { id: string; company_name: string; ticker?: string; ev_revenue_multiple?: number; ev_ebitda_multiple?: number; pe_ratio?: number; growth_rate_pct?: number }
+    const render = (list: Comp[]) => {
+      const avgEvRev = list.length ? list.reduce((a, c) => a + (c.ev_revenue_multiple ?? 0), 0) / list.length : 0
+      patchKpiCards(root, [
+        { value: String(list.length), label: 'Comp companies' },
+        { value: avgEvRev ? `${avgEvRev.toFixed(1)}×` : '—', label: 'Avg EV/Rev' },
+        { value: '—', label: 'Median P/E' },
+        { value: '—', label: 'Industry' },
+      ])
+      const rows = list.slice(0, 50).map((c) => `<tr><td><strong>${escapeHtml(c.company_name)}</strong>${c.ticker ? `<br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(c.ticker)}</span>` : ''}<button data-del="${c.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td class="num">${c.ev_revenue_multiple?.toFixed(1) ?? '—'}×</td><td class="num">${c.ev_ebitda_multiple?.toFixed(1) ?? '—'}×</td><td class="num">${c.pe_ratio?.toFixed(1) ?? '—'}</td><td class="num">${c.growth_rate_pct?.toFixed(1) ?? '—'}%</td></tr>`)
+      patchTable(root, '.card', rows, 'Chưa có comp. Bấm "+ Add peer" để thêm peer company.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá peer này?')) return
+        const r = await apiSend(`/api/comparables/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/comparables', 'GET'); if (r.ok) render((r.data as Comp[]) ?? []) }
+    render(((raw as { data?: Comp[] })?.data) ?? [])
+    wireButtonByText(root, 'peer', async () => {
+      const fields: Field[] = [
+        { name: 'company_name', label: 'Tên công ty', required: true },
+        { name: 'ticker', label: 'Mã (ticker)' },
+        { name: 'exchange', label: 'Sàn' },
+        { name: 'ev_revenue_multiple', label: 'EV/Revenue (×)', type: 'number' },
+        { name: 'ev_ebitda_multiple', label: 'EV/EBITDA (×)', type: 'number' },
+        { name: 'pe_ratio', label: 'P/E', type: 'number' },
+        { name: 'growth_rate_pct', label: 'Growth %', type: 'number' },
+      ]
+      const v = await openFormModal({ title: 'Thêm peer company', fields, submitLabel: 'Thêm' })
+      if (!v) return
+      const res = await apiSend('/api/comparables', 'POST', {
+        company_name: v.company_name, ticker: v.ticker || undefined, exchange: v.exchange || undefined,
+        ev_revenue_multiple: num(v.ev_revenue_multiple), ev_ebitda_multiple: num(v.ev_ebitda_multiple),
+        pe_ratio: num(v.pe_ratio), growth_rate_pct: num(v.growth_rate_pct),
+      })
+      if (res.ok) { toast('Đã thêm peer'); void refresh() } else toast(res.error ?? 'Lỗi thêm', 'err')
+    })
   },
 
   'page-mktdata': (raw) => {
@@ -874,6 +1014,7 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-nlq': (raw) => {
     const root = document.getElementById('page-nlq')
     if (!root) return
+    // history KPI cards (no-op if the page has no .kpi-row)
     const list = ((raw as { data?: Array<{ id: string; query_text: string; status?: string; duration_ms?: number; created_at: string }> })?.data) ?? []
     const success = list.filter((q) => q.status === 'success').length
     const avgMs = list.length ? Math.round(list.reduce((a, q) => a + (q.duration_ms ?? 0), 0) / list.length) : 0
@@ -883,6 +1024,39 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
       { value: `${avgMs}<em>ms</em>`, label: 'Avg latency' },
       { value: list[0] ? fmtDate(list[0].created_at) : '—', label: 'Latest' },
     ])
+
+    // Wire the "ASK ANYTHING" input + suggestion buttons → real /api/nlq.
+    const input = root.querySelector<HTMLInputElement>('input[type="text"]')
+    const cardB = input?.closest('.card-b') ?? root.querySelector('.card-b') ?? root
+    let resultBox = cardB.querySelector<HTMLElement>('#nlqResult')
+    if (!resultBox) {
+      resultBox = document.createElement('div')
+      resultBox.id = 'nlqResult'
+      resultBox.style.marginTop = '16px'
+      cardB.appendChild(resultBox)
+    }
+    const box = resultBox
+    const ask = async (qText: string) => {
+      const q = qText.trim()
+      if (!q) return
+      box.innerHTML = `<div style="padding:14px;color:var(--dim)">Đang hỏi AI…</div>`
+      const r = await apiSend('/api/nlq', 'POST', { query_text: q })
+      if (!r.ok) { box.innerHTML = `<div style="padding:14px;color:var(--err)">${escapeHtml(r.error ?? 'Lỗi truy vấn')}</div>`; return }
+      const d = r.data as { rows?: Array<Record<string, unknown>>; summary?: string; intent?: { intent_summary?: string }; meta?: { model?: string; duration_ms?: number } }
+      const rows = d.rows ?? []
+      const cols = rows.length ? Object.keys(rows[0]) : []
+      const head = cols.map((c) => `<th>${escapeHtml(c)}</th>`).join('')
+      const tbody = rows.slice(0, 50).map((row) => `<tr>${cols.map((c) => `<td>${escapeHtml(String(row[c] ?? ''))}</td>`).join('')}</tr>`).join('')
+      box.innerHTML = `<div style="padding:14px;background:rgba(255,255,255,.05);border-radius:6px">
+        <div class="mono" style="font-size:.62rem;color:var(--gold-b);letter-spacing:.1em;margin-bottom:6px">AI · ${escapeHtml(d.meta?.model ?? '')} · ${d.meta?.duration_ms ?? 0}ms</div>
+        <div style="font-size:.86rem;margin-bottom:10px">${escapeHtml(d.intent?.intent_summary || d.summary || '')}</div>
+        ${rows.length ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>${head}</tr></thead><tbody>${tbody}</tbody></table></div>` : '<div style="color:var(--dim)">Không có dòng dữ liệu.</div>'}</div>`
+    }
+    if (input && input.dataset.zaWired !== '1') {
+      input.dataset.zaWired = '1'
+      input.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') { e.preventDefault(); void ask(input.value) } })
+    }
+    wireEach(cardB, '.btn.gh.sm', async (el) => { const t = el.textContent ?? ''; if (input) input.value = t; void ask(t) })
   },
 
   'page-sales': (raw) => {
