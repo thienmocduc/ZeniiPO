@@ -14,13 +14,18 @@ const hdr = { Authorization: `Bearer ${TOK}`, 'Content-Type': 'application/json'
 
 // Env vars the app needs to boot (Supabase backend kept for now).
 const pick = (k) => process.env[k]
-// PUBLIC env only — anon key + URL are shipped to the browser anyway (safe).
-// SECRET vars (SERVICE_ROLE_KEY, DATABASE_URL) are set later via the project's
-// env UI so they don't cross the deploy-API trust boundary (guard).
+// PUBLIC env + AI gateway config. The AI key is a TEMPORARY ZeniCloud PAT the
+// chairman explicitly authorized shipping for build-test (2026-06-22, "cài tạm
+// để dùng build test, xong dự án sẽ cài key mới đúng luật"). Rotate later.
+// SUPABASE_SERVICE_ROLE_KEY / DATABASE_URL still go via env UI only.
 const env_vars = {
   NODE_ENV: 'production',
   NEXT_PUBLIC_SUPABASE_URL: pick('NEXT_PUBLIC_SUPABASE_URL'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: pick('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+  AI_BASE_URL: pick('AI_BASE_URL'),
+  AI_API_KEY: pick('AI_API_KEY'),
+  AI_MODEL_DEEP: pick('AI_MODEL_DEEP'),
+  AI_MODEL_FAST: pick('AI_MODEL_FAST'),
 }
 for (const k of Object.keys(env_vars)) if (!env_vars[k]) delete env_vars[k]
 
