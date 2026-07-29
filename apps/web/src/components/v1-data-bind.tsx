@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { openFormModal, apiSend, toast, num, wireButtonByText, wireEach, type Field } from '@/components/v1-actions'
+import { openFormModal, apiSend, toast, num, wireButtonByText, wireEach, ensureHeaderButton, type Field } from '@/components/v1-actions'
 
 type Json = Record<string, unknown> | null
 
@@ -640,29 +640,104 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-dataroom': (raw) => {
     const root = document.getElementById('page-dataroom')
     if (!root) return
-    const d = (raw as { data?: { folders?: unknown[]; docs?: Array<{ id: string; title: string; mime_type?: string; file_size_bytes?: number; created_at: string }> } })?.data
-    const docs = d?.docs ?? []
-    const folders = d?.folders ?? []
-    patchKpiCards(root, [
-      { value: String(docs.length), label: 'Total docs' },
-      { value: String(folders.length), label: 'Folders' },
-      { value: `${(docs.reduce((a, d) => a + (d.file_size_bytes ?? 0), 0) / 1_000_000).toFixed(1)}<em>MB</em>`, label: 'Storage' },
-      { value: String(docs.filter((d) => /pdf|presentation|spreadsheet/.test(d.mime_type ?? '')).length), label: 'Pitch + Reports' },
-    ])
-    const rows = docs.slice(0, 30).map((d) => `<tr><td><strong>${escapeHtml(d.title)}</strong></td><td>${escapeHtml(d.mime_type ?? '—')}</td><td class="num">${((d.file_size_bytes ?? 0) / 1024).toFixed(0)} KB</td><td>${fmtDate(d.created_at)}</td></tr>`)
-    patchTable(root, '.card', rows, 'Data room trống. Upload tài liệu đầu tiên qua /vault.', 4)
+    type VaultData = { folders?: Array<{ id: string; name: string }>; docs?: Array<{ id: string; title: string; mime_type?: string; file_size_bytes?: number; created_at: string }> }
+    const render = (d?: VaultData) => {
+      const docs = d?.docs ?? []
+      const folders = d?.folders ?? []
+      patchKpiCards(root, [
+        { value: String(docs.length), label: 'Total docs' },
+        { value: String(folders.length), label: 'Folders' },
+        { value: `${(docs.reduce((a, x) => a + (x.file_size_bytes ?? 0), 0) / 1_000_000).toFixed(1)}<em>MB</em>`, label: 'Storage' },
+        { value: String(docs.filter((x) => /pdf|presentation|spreadsheet/.test(x.mime_type ?? '')).length), label: 'Pitch + Reports' },
+      ])
+      const folderRow = folders.length
+        ? `<tr><td colspan="4" style="color:var(--dim);font-size:.75rem">📁 ${folders.map((f) => escapeHtml(f.name)).join(' · 📁 ')}</td></tr>`
+        : ''
+      const rows = docs.slice(0, 30).map((x) => `<tr><td><strong>${escapeHtml(x.title)}</strong></td><td>${escapeHtml(x.mime_type ?? '—')}</td><td class="num">${((x.file_size_bytes ?? 0) / 1024).toFixed(0)} KB</td><td>${fmtDate(x.created_at)}</td></tr>`)
+      patchTable(root, '.card', folderRow ? [folderRow, ...rows] : rows, 'Data room trống. Tạo folder cấu trúc DD (Corporate/Financials/Legal/IP…) rồi upload tài liệu.', 4)
+    }
+    const refresh = async () => { const r = await apiSend('/api/vault', 'GET'); if (r.ok) render(r.data as VaultData) }
+    render((raw as { data?: VaultData })?.data)
+    ensureHeaderButton(root, 'za-add-folder', '+ Folder', async () => {
+      const v = await openFormModal({
+        title: 'Tạo folder data room',
+        fields: [{ name: 'name', label: 'Tên folder', required: true, placeholder: 'Corporate / Financials / Legal / IP…' }],
+        submitLabel: 'Tạo',
+      })
+      if (!v) return
+      const res = await apiSend('/api/vault', 'POST', { name: v.name })
+      if (res.ok) { toast('Đã tạo folder'); void refresh() } else toast(res.error ?? 'Lỗi tạo folder', 'err')
+    })
   },
 
   'page-council': (raw) => {
     const root = document.getElementById('page-council')
     if (!root) return
-    const d = (raw as { data?: Array<{ id: string; question: string; status?: string; created_at: string }> })?.data ?? []
-    patchKpiCards(root, [
-      { value: String(d.length), label: 'Decisions logged' },
-      { value: String(d.filter((x) => x.status === 'approved').length), label: 'Approved' },
-      { value: String(d.filter((x) => x.status === 'pending').length), label: 'Pending' },
-      { value: String(d.filter((x) => x.status === 'rejected').length), label: 'Rejected' },
-    ])
+    type Ev = { id: string; created_at: string; payload?: { input?: { description?: string }; result?: { overall_score?: number; recommendation?: string; summary?: string; votes?: Array<{ agent: string; vote: string; score: number; reasoning: string }> } } }
+    const renderHistory = (list: Ev[]) => {
+      const results = list.map((e) => e.payload?.result).filter(Boolean)
+      const go = results.filter((r) => r?.recommendation === 'go').length
+      const revise = results.filter((r) => r?.recommendation === 'revise').length
+      const nogo = results.filter((r) => r?.recommendation === 'no_go').length
+      patchKpiCards(root, [
+        { value: String(list.length), label: 'Validations' },
+        { value: String(go), label: 'GO' },
+        { value: String(revise), label: 'Revise' },
+        { value: String(nogo), label: 'No-go' },
+      ])
+    }
+    renderHistory(((raw as { data?: Ev[] })?.data) ?? [])
+
+    // Result panel host (created once).
+    let panel = root.querySelector<HTMLElement>('#council-result')
+    if (!panel) {
+      panel = document.createElement('div')
+      panel.id = 'council-result'
+      panel.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02));display:none'
+      const kpiRow = root.querySelector('.kpi-row')
+      if (kpiRow?.parentNode) kpiRow.parentNode.insertBefore(panel, kpiRow.nextSibling)
+      else root.appendChild(panel)
+    }
+    const box = panel
+
+    ensureHeaderButton(root, 'za-run-council', '⚖ Chạy Council 9', async () => {
+      const v = await openFormModal({
+        title: 'Council of 9 — thẩm định ý tưởng/quyết định',
+        fields: [
+          { name: 'description', label: 'Mô tả ý tưởng/quyết định (≥20 ký tự)', type: 'textarea', required: true },
+          { name: 'industry', label: 'Ngành', required: true, placeholder: 'F&B / SaaS / fintech…' },
+          { name: 'market_size', label: 'Quy mô thị trường', type: 'textarea' },
+          { name: 'competition', label: 'Cạnh tranh', type: 'textarea' },
+          { name: 'team_background', label: 'Đội ngũ', type: 'textarea' },
+        ],
+        submitLabel: 'Trình Council',
+      })
+      if (!v) return
+      box.style.display = 'block'
+      box.innerHTML = `<div style="color:var(--dim);padding:10px">⚖ 9 vị thần đang nghị sự… (~30-60s)</div>`
+      const r = await apiSend('/api/council', 'POST', {
+        description: v.description, industry: v.industry,
+        market_size: v.market_size || undefined, competition: v.competition || undefined,
+        team_background: v.team_background || undefined,
+      })
+      if (!r.ok) {
+        box.innerHTML = `<div style="color:var(--err,#e0685f);padding:10px">${escapeHtml(r.error ?? 'Lỗi chạy Council')}${String(r.error ?? '').includes('AI') ? '<br/><span style="color:var(--dim);font-size:.8rem">AI chưa cấu hình — chờ đấu key WitsPro 5.5.</span>' : ''}</div>`
+        return
+      }
+      const d = r.data as { overall_score?: number; recommendation?: string; summary?: string; votes?: Array<{ agent: string; vote: string; score: number; reasoning: string }> }
+      const recCls = d.recommendation === 'go' ? 'var(--ok,#4fc79a)' : d.recommendation === 'no_go' ? 'var(--err,#e0685f)' : 'var(--gold,#e4c16e)'
+      const voteRows = (d.votes ?? []).map((vt) => `<tr><td><strong>${escapeHtml(vt.agent)}</strong></td><td><span style="color:${vt.vote === 'green' ? 'var(--ok,#4fc79a)' : vt.vote === 'red' ? 'var(--err,#e0685f)' : 'var(--gold,#e4c16e)'};font-weight:700">${escapeHtml(vt.vote)}</span></td><td class="num">${vt.score}</td><td style="font-size:.78rem;color:var(--ink-2,#b3b2aa)">${escapeHtml(vt.reasoning)}</td></tr>`).join('')
+      box.innerHTML = `
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px">
+          <strong style="font-size:1.05rem">Phán quyết: <span style="color:${recCls};text-transform:uppercase">${escapeHtml(d.recommendation ?? '—')}</span></strong>
+          <span>Điểm tổng: <strong>${d.overall_score ?? '—'}/100</strong></span>
+        </div>
+        <p style="color:var(--ink-2,#b3b2aa);font-size:.85rem;margin:0 0 10px">${escapeHtml(d.summary ?? '')}</p>
+        <div style="overflow-x:auto"><table class="tbl" style="width:100%"><thead><tr><th>Agent</th><th>Vote</th><th>Điểm</th><th>Lý do</th></tr></thead><tbody>${voteRows}</tbody></table></div>`
+      const rr = await apiSend('/api/council', 'GET')
+      if (rr.ok) renderHistory((rr.data as Ev[]) ?? [])
+      toast('Council đã phán quyết')
+    })
   },
 
   'page-datafow': (raw) => {
@@ -735,17 +810,51 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-investors': (raw) => {
     const root = document.getElementById('page-investors')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; investor_name: string; firm_name?: string; stage?: string; target_check_usd?: number; committed_usd?: number; probability_pct?: number; next_action?: string }> })?.data) ?? []
-    const totalTarget = list.reduce((a, i) => a + (i.target_check_usd ?? 0), 0)
-    const totalCommit = list.reduce((a, i) => a + (i.committed_usd ?? 0), 0)
-    patchKpiCards(root, [
-      { value: String(list.length), label: 'Investors' },
-      { value: fmtMoney(totalTarget), label: 'Target raise' },
-      { value: fmtMoney(totalCommit), label: 'Committed' },
-      { value: `${totalTarget ? Math.round((totalCommit / totalTarget) * 100) : 0}<em>%</em>`, label: 'Progress' },
-    ])
-    const rows = list.slice(0, 20).map((i) => `<tr><td><strong>${escapeHtml(i.investor_name)}</strong>${i.firm_name ? `<br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(i.firm_name)}</span>` : ''}</td><td>${escapeHtml(i.stage ?? '—')}</td><td class="num">${typeof i.target_check_usd === 'number' ? fmtMoney(i.target_check_usd) : '—'}</td><td class="num">${typeof i.probability_pct === 'number' ? `${i.probability_pct}%` : '—'}</td><td>${escapeHtml(i.next_action ?? '—')}</td></tr>`)
-    patchTable(root, '.card', rows, 'Chưa có investor nào. Bấm "+ Add investor" để bắt đầu pipeline.', 5)
+    type Inv = { id: string; investor_name: string; firm_name?: string; stage?: string; target_check_usd?: number; committed_usd?: number; probability_pct?: number; next_action?: string }
+    const render = (list: Inv[]) => {
+      const totalTarget = list.reduce((a, i) => a + (i.target_check_usd ?? 0), 0)
+      const totalCommit = list.reduce((a, i) => a + (i.committed_usd ?? 0), 0)
+      patchKpiCards(root, [
+        { value: String(list.length), label: 'Investors' },
+        { value: fmtMoney(totalTarget), label: 'Target raise' },
+        { value: fmtMoney(totalCommit), label: 'Committed' },
+        { value: `${totalTarget ? Math.round((totalCommit / totalTarget) * 100) : 0}<em>%</em>`, label: 'Progress' },
+      ])
+      const rows = list.slice(0, 30).map((i) => `<tr><td><strong>${escapeHtml(i.investor_name)}</strong>${i.firm_name ? `<br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(i.firm_name)}</span>` : ''}<button data-del="${i.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(i.stage ?? '—')}</td><td class="num">${typeof i.target_check_usd === 'number' ? fmtMoney(i.target_check_usd) : '—'}</td><td class="num">${typeof i.probability_pct === 'number' ? `${i.probability_pct}%` : '—'}</td><td>${escapeHtml(i.next_action ?? '—')}</td></tr>`)
+      patchTable(root, '.card', rows, 'Chưa có investor nào. Bấm "+ Investor" để bắt đầu pipeline.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá investor này khỏi pipeline?')) return
+        const r = await apiSend(`/api/pipeline/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/investors', 'GET'); if (r.ok) render((r.data as Inv[]) ?? []) }
+    render(((raw as { data?: Inv[] })?.data) ?? [])
+    ensureHeaderButton(root, 'za-add-investor', '+ Investor', async () => {
+      const v = await openFormModal({
+        title: 'Thêm investor vào pipeline',
+        fields: [
+          { name: 'investor_name', label: 'Tên investor', required: true },
+          { name: 'firm_name', label: 'Quỹ/Công ty' },
+          { name: 'investor_type', label: 'Loại', type: 'select', options: ['angel','vc','pe','strategic','family_office','other'].map((x) => ({ value: x, label: x })) },
+          { name: 'stage', label: 'Giai đoạn', type: 'select', options: ['research','contacted','meeting','dd','term_sheet','committed','passed'].map((x) => ({ value: x, label: x })) },
+          { name: 'target_check_usd', label: 'Target check (USD)', type: 'number' },
+          { name: 'probability_pct', label: 'Xác suất %', type: 'number' },
+          { name: 'contact_email', label: 'Email liên hệ' },
+          { name: 'next_action', label: 'Việc tiếp theo' },
+        ],
+        submitLabel: 'Thêm investor',
+      })
+      if (!v) return
+      const res = await apiSend('/api/investors', 'POST', {
+        investor_name: v.investor_name, firm_name: v.firm_name || undefined,
+        investor_type: v.investor_type || undefined, stage: v.stage || undefined,
+        target_check_usd: num(v.target_check_usd), probability_pct: num(v.probability_pct),
+        contact_email: v.contact_email || undefined, next_action: v.next_action || undefined,
+      })
+      if (res.ok) { toast('Đã thêm investor'); void refresh() } else toast(res.error ?? 'Lỗi thêm', 'err')
+    })
   },
 
   'page-pitch': (raw) => {
@@ -929,14 +1038,49 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-token': (raw) => {
     const root = document.getElementById('page-token')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; token_symbol: string; pool_name: string; allocation_pct: number; vested_amount?: number; total_supply?: number }> })?.data) ?? []
-    const totalPct = list.reduce((a, t) => a + Number(t.allocation_pct), 0)
-    patchKpiCards(root, [
-      { value: String(list.length), label: 'Pools' },
-      { value: `${totalPct.toFixed(1)}<em>%</em>`, label: 'Allocated' },
-      { value: list[0] ? escapeHtml(list[0].token_symbol) : '—', label: 'Token' },
-      { value: list[0]?.total_supply ? fmtNum(list[0].total_supply) : '—', label: 'Total supply' },
-    ])
+    type Alloc = { id: string; token_symbol: string; pool_name: string; allocation_pct: number; vested_amount?: number; total_supply?: number; vesting_cliff_months?: number; vesting_duration_months?: number; blockchain?: string }
+    const render = (list: Alloc[]) => {
+      const totalPct = list.reduce((a, t) => a + Number(t.allocation_pct), 0)
+      patchKpiCards(root, [
+        { value: String(list.length), label: 'Pools' },
+        { value: `${totalPct.toFixed(1)}<em>%</em>`, label: 'Allocated', sub: totalPct > 100 ? '⚠ vượt 100%' : `còn ${(100 - totalPct).toFixed(1)}%` },
+        { value: list[0] ? escapeHtml(list[0].token_symbol) : '—', label: 'Token' },
+        { value: list[0]?.total_supply ? fmtNum(list[0].total_supply) : '—', label: 'Total supply' },
+      ])
+      const rows = list.slice(0, 30).map((t) => `<tr><td><strong>${escapeHtml(t.pool_name)}</strong><button data-del="${t.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(t.token_symbol)}</td><td class="num">${Number(t.allocation_pct).toFixed(1)}%</td><td class="num">${t.vesting_cliff_months ?? 0}m cliff · ${t.vesting_duration_months ?? 0}m</td><td>${escapeHtml(t.blockchain ?? '—')}</td></tr>`)
+      patchTable(root, '.card', rows, 'Chưa có pool. Bấm "+ Pool" để thêm phân bổ tokenomics.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá pool này?')) return
+        const r = await apiSend(`/api/tokenomics/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/tokenomics', 'GET'); if (r.ok) render((r.data as Alloc[]) ?? []) }
+    render(((raw as { data?: Alloc[] })?.data) ?? [])
+    ensureHeaderButton(root, 'za-add-pool', '+ Pool', async () => {
+      const v = await openFormModal({
+        title: 'Thêm pool tokenomics',
+        fields: [
+          { name: 'token_symbol', label: 'Token symbol', required: true, placeholder: 'ZENI' },
+          { name: 'pool_name', label: 'Tên pool', required: true, placeholder: 'Team / Investors / Ecosystem…' },
+          { name: 'allocation_pct', label: 'Phân bổ %', type: 'number', required: true, step: '0.1' },
+          { name: 'total_supply', label: 'Total supply', type: 'number' },
+          { name: 'vesting_cliff_months', label: 'Cliff (tháng)', type: 'number' },
+          { name: 'vesting_duration_months', label: 'Vesting (tháng)', type: 'number' },
+          { name: 'blockchain', label: 'Blockchain', placeholder: 'polygon' },
+        ],
+        submitLabel: 'Thêm pool',
+      })
+      if (!v) return
+      const res = await apiSend('/api/tokenomics', 'POST', {
+        token_symbol: v.token_symbol, pool_name: v.pool_name,
+        allocation_pct: num(v.allocation_pct) ?? 0, total_supply: num(v.total_supply),
+        vesting_cliff_months: num(v.vesting_cliff_months), vesting_duration_months: num(v.vesting_duration_months),
+        blockchain: v.blockchain || undefined,
+      })
+      if (res.ok) { toast('Đã thêm pool'); void refresh() } else toast(res.error ?? 'Lỗi thêm', 'err')
+    })
   },
 
   'page-comparables': (raw) => {
@@ -986,29 +1130,96 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-mktdata': (raw) => {
     const root = document.getElementById('page-mktdata')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; metric_type: string; region?: string; value_numeric?: number; value_unit?: string; confidence?: string }> })?.data) ?? []
-    const tam = list.find((m) => m.metric_type === 'tam')
-    const sam = list.find((m) => m.metric_type === 'sam')
-    const som = list.find((m) => m.metric_type === 'som')
-    const growth = list.find((m) => m.metric_type === 'growth_rate')
-    patchKpiCards(root, [
-      tam?.value_numeric ? { value: fmtMoney(tam.value_numeric), label: 'TAM' } : null,
-      sam?.value_numeric ? { value: fmtMoney(sam.value_numeric), label: 'SAM' } : null,
-      som?.value_numeric ? { value: fmtMoney(som.value_numeric), label: 'SOM' } : null,
-      growth?.value_numeric ? { value: `${growth.value_numeric}<em>%</em>`, label: 'Growth' } : null,
-    ])
+    type Md = { id: string; metric_type: string; region?: string; segment?: string; value_numeric?: number; value_unit?: string; confidence?: string; source?: string }
+    const render = (list: Md[]) => {
+      const pick = (t: string) => list.find((m) => m.metric_type === t)
+      const tam = pick('tam'); const sam = pick('sam'); const som = pick('som'); const growth = pick('growth_rate')
+      patchKpiCards(root, [
+        tam?.value_numeric ? { value: fmtMoney(tam.value_numeric), label: 'TAM' } : { value: '—', label: 'TAM' },
+        sam?.value_numeric ? { value: fmtMoney(sam.value_numeric), label: 'SAM' } : { value: '—', label: 'SAM' },
+        som?.value_numeric ? { value: fmtMoney(som.value_numeric), label: 'SOM' } : { value: '—', label: 'SOM' },
+        growth?.value_numeric ? { value: `${growth.value_numeric}<em>%</em>`, label: 'Growth' } : { value: '—', label: 'Growth' },
+      ])
+      const rows = list.slice(0, 40).map((m) => `<tr><td><strong>${escapeHtml(m.metric_type.toUpperCase())}</strong><button data-del="${m.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(m.region ?? '—')}${m.segment ? ` · ${escapeHtml(m.segment)}` : ''}</td><td class="num">${m.value_numeric != null ? fmtNum(m.value_numeric) : '—'} ${escapeHtml(m.value_unit ?? '')}</td><td>${escapeHtml(m.source ?? '—')}</td><td><span class="st ${m.confidence === 'verified' || m.confidence === 'high' ? 'ok' : 'dim'}">${escapeHtml(m.confidence ?? '—')}</span></td></tr>`)
+      patchTable(root, '.card', rows, 'Chưa có dữ liệu thị trường. Bấm "+ Metric" để thêm TAM/SAM/SOM.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá metric này?')) return
+        const r = await apiSend(`/api/market-data/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/market-data', 'GET'); if (r.ok) render((r.data as Md[]) ?? []) }
+    render(((raw as { data?: Md[] })?.data) ?? [])
+    ensureHeaderButton(root, 'za-add-mktdata', '+ Metric', async () => {
+      const v = await openFormModal({
+        title: 'Thêm market metric',
+        fields: [
+          { name: 'metric_type', label: 'Loại', type: 'select', required: true, options: ['tam','sam','som','growth_rate','penetration','share','competitor_count','arpu','market_size'].map((x) => ({ value: x, label: x.toUpperCase() })) },
+          { name: 'value_numeric', label: 'Giá trị', type: 'number', required: true },
+          { name: 'value_unit', label: 'Đơn vị', placeholder: 'USD / % / count' },
+          { name: 'region', label: 'Vùng', placeholder: 'VN / SEA / Global' },
+          { name: 'segment', label: 'Phân khúc' },
+          { name: 'source', label: 'Nguồn' },
+          { name: 'confidence', label: 'Độ tin cậy', type: 'select', options: ['low','medium','high','verified'].map((x) => ({ value: x, label: x })) },
+        ],
+        submitLabel: 'Thêm',
+      })
+      if (!v) return
+      const res = await apiSend('/api/market-data', 'POST', {
+        metric_type: v.metric_type, value_numeric: num(v.value_numeric), value_unit: v.value_unit || undefined,
+        region: v.region || undefined, segment: v.segment || undefined, source: v.source || undefined,
+        confidence: v.confidence || undefined,
+      })
+      if (res.ok) { toast('Đã thêm metric'); void refresh() } else toast(res.error ?? 'Lỗi thêm', 'err')
+    })
   },
 
   'page-mktintel': (raw) => {
     const root = document.getElementById('page-mktintel')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; category: string; severity?: string; title: string; created_at: string }> })?.data) ?? []
-    patchKpiCards(root, [
-      { value: String(list.length), label: 'Signals' },
-      { value: String(list.filter((i) => i.severity === 'critical' || i.severity === 'alert').length), label: 'Alerts' },
-      { value: String(new Set(list.map((i) => i.category)).size), label: 'Categories' },
-      { value: list[0] ? fmtDate(list[0].created_at) : '—', label: 'Latest' },
-    ])
+    type Intel = { id: string; category: string; severity?: string; title: string; related_competitor?: string; region?: string; created_at: string }
+    const render = (list: Intel[]) => {
+      patchKpiCards(root, [
+        { value: String(list.length), label: 'Signals' },
+        { value: String(list.filter((i) => i.severity === 'critical' || i.severity === 'alert').length), label: 'Alerts' },
+        { value: String(new Set(list.map((i) => i.category)).size), label: 'Categories' },
+        { value: list[0] ? fmtDate(list[0].created_at) : '—', label: 'Latest' },
+      ])
+      const sevCls = (s?: string) => (s === 'critical' ? 'err' : s === 'alert' ? 'warn' : 'dim')
+      const rows = list.slice(0, 40).map((i) => `<tr><td><strong>${escapeHtml(i.title)}</strong><button data-del="${i.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(i.category)}</td><td><span class="st ${sevCls(i.severity)}">${escapeHtml(i.severity ?? 'info')}</span></td><td>${escapeHtml(i.related_competitor ?? i.region ?? '—')}</td><td>${fmtDate(i.created_at)}</td></tr>`)
+      patchTable(root, '.card', rows, 'Chưa có tín hiệu thị trường. Bấm "+ Signal" để ghi nhận.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá tín hiệu này?')) return
+        const r = await apiSend(`/api/market-intel/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/market-intel', 'GET'); if (r.ok) render((r.data as Intel[]) ?? []) }
+    render(((raw as { data?: Intel[] })?.data) ?? [])
+    ensureHeaderButton(root, 'za-add-intel', '+ Signal', async () => {
+      const v = await openFormModal({
+        title: 'Ghi nhận tín hiệu thị trường',
+        fields: [
+          { name: 'title', label: 'Tiêu đề', required: true },
+          { name: 'category', label: 'Loại', type: 'select', required: true, options: ['competitor','regulation','market_shift','customer_signal','tech_trend','m_and_a','funding_round','exit'].map((x) => ({ value: x, label: x })) },
+          { name: 'severity', label: 'Mức độ', type: 'select', options: ['info','watch','alert','critical'].map((x) => ({ value: x, label: x })) },
+          { name: 'related_competitor', label: 'Đối thủ liên quan' },
+          { name: 'region', label: 'Vùng' },
+          { name: 'body', label: 'Chi tiết', type: 'textarea' },
+          { name: 'source_url', label: 'Link nguồn' },
+        ],
+        submitLabel: 'Ghi nhận',
+      })
+      if (!v) return
+      const res = await apiSend('/api/market-intel', 'POST', {
+        title: v.title, category: v.category, severity: v.severity || undefined,
+        related_competitor: v.related_competitor || undefined, region: v.region || undefined,
+        body: v.body || undefined, source_url: v.source_url || undefined,
+      })
+      if (res.ok) { toast('Đã ghi nhận'); void refresh() } else toast(res.error ?? 'Lỗi', 'err')
+    })
   },
 
   'page-nlq': (raw) => {
@@ -1089,13 +1300,43 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-fclb': (raw) => {
     const root = document.getElementById('page-fclb')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; category: string; status: string; severity: string; title: string }> })?.data) ?? []
-    patchKpiCards(root, [
-      { value: String(list.length), label: 'Total feedback' },
-      { value: String(list.filter((f) => f.status === 'open').length), label: 'Open' },
-      { value: String(list.filter((f) => f.status === 'resolved').length), label: 'Resolved' },
-      { value: String(list.filter((f) => f.severity === 'critical' || f.severity === 'high').length), label: 'High priority' },
-    ])
+    type Fb = { id: string; category: string; status: string; severity: string; title: string; created_at?: string }
+    const render = (list: Fb[]) => {
+      patchKpiCards(root, [
+        { value: String(list.length), label: 'Total feedback' },
+        { value: String(list.filter((f) => f.status === 'open').length), label: 'Open' },
+        { value: String(list.filter((f) => f.status === 'resolved').length), label: 'Resolved' },
+        { value: String(list.filter((f) => f.severity === 'critical' || f.severity === 'high').length), label: 'High priority' },
+      ])
+      const sevCls = (s: string) => (s === 'critical' ? 'err' : s === 'high' ? 'warn' : 'dim')
+      const rows = list.slice(0, 40).map((f) => `<tr><td><strong>${escapeHtml(f.title)}</strong><button data-del="${f.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(f.category)}</td><td><span class="st ${sevCls(f.severity)}">${escapeHtml(f.severity)}</span></td><td><span class="st ${f.status === 'resolved' ? 'ok' : 'info'}">${escapeHtml(f.status)}</span></td><td>${f.created_at ? fmtDate(f.created_at) : '—'}</td></tr>`)
+      patchTable(root, '.card', rows, 'Chưa có feedback. Bấm "+ Feedback" để gửi góp ý đầu tiên.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá feedback này?')) return
+        const r = await apiSend(`/api/feedback/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/feedback', 'GET'); if (r.ok) render((r.data as Fb[]) ?? []) }
+    render(((raw as { data?: Fb[] })?.data) ?? [])
+    ensureHeaderButton(root, 'za-add-fb', '+ Feedback', async () => {
+      const v = await openFormModal({
+        title: 'Gửi feedback',
+        fields: [
+          { name: 'title', label: 'Tiêu đề', required: true },
+          { name: 'category', label: 'Loại', type: 'select', options: ['bug','feature_request','ux','data_quality','performance','other'].map((x) => ({ value: x, label: x })) },
+          { name: 'severity', label: 'Mức độ', type: 'select', options: ['low','medium','high','critical'].map((x) => ({ value: x, label: x })) },
+          { name: 'body', label: 'Chi tiết', type: 'textarea' },
+        ],
+        submitLabel: 'Gửi',
+      })
+      if (!v) return
+      const res = await apiSend('/api/feedback', 'POST', {
+        title: v.title, category: v.category || 'other', severity: v.severity || 'medium', body: v.body || undefined,
+      })
+      if (res.ok) { toast('Đã gửi feedback'); void refresh() } else toast(res.error ?? 'Lỗi gửi', 'err')
+    })
   },
 
   'page-gvdoc': (raw) => {

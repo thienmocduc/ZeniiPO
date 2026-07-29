@@ -182,3 +182,32 @@ export const num = (v: string | undefined): number | undefined => {
   const n = Number(v)
   return Number.isFinite(n) ? n : undefined
 }
+
+/**
+ * Guarantee an action button exists in the page header (`.ph-r`), regardless
+ * of what demo buttons the static HTML shipped with. Idempotent by id —
+ * re-patching only rebinds the handler onto the same element.
+ */
+export function ensureHeaderButton(
+  root: ParentNode,
+  id: string,
+  label: string,
+  handler: () => void | Promise<void>,
+): void {
+  let btn = (root as HTMLElement).querySelector<HTMLButtonElement>(`#${id}`)
+  if (!btn) {
+    btn = document.createElement('button')
+    btn.id = id
+    btn.className = 'btn btn-pri'
+    btn.textContent = label
+    const host =
+      (root as HTMLElement).querySelector('.ph-r') ??
+      (root as HTMLElement).querySelector('.ph') ??
+      (root as HTMLElement)
+    host.appendChild(btn)
+  }
+  if (btn.dataset.zaWired !== '1') {
+    btn.dataset.zaWired = '1'
+    btn.addEventListener('click', (e) => { e.preventDefault(); void handler() })
+  }
+}
