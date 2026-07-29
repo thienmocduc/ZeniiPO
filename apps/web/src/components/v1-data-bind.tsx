@@ -34,9 +34,9 @@ const PAGE_API_MAP: Record<string, string> = {
   'page-tasks': '/api/tasks',
   'page-captable': '/api/cap-table',
   'page-fundraise': '/api/pipeline',
-  'page-pnl': '/api/dashboard',
+  'page-pnl': '/api/financials',
   'page-ipo': '/api/journeys',
-  'page-roadmap': '/api/journeys',
+  'page-roadmap': '/api/roadmap',
   'page-agents': '/api/agents',
   // Chunk 3 — 35 additional pages
   'page-northstar': '/api/dashboard',
@@ -389,24 +389,92 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-pnl': (raw) => {
     const root = document.getElementById('page-pnl')
     if (!root) return
-    const d = (raw as { data?: { kpis?: Array<{ name: string; value: number; unit?: string }> } })?.data
-    const kpis = d?.kpis ?? []
-    const cards = root.querySelectorAll<HTMLElement>('.kpi-row .kpi-card')
-    const findKpi = (rx: RegExp) => kpis.find((k) => rx.test(k.name))
-    const rev = findKpi(/revenue|arr|mrr/i)
-    const gm = findKpi(/gross\s*margin|gm/i)
-    const burn = findKpi(/burn/i)
-    const cash = findKpi(/cash|runway/i)
-    const pairs: Array<[Element | undefined, { name: string; value: number; unit?: string } | undefined]> = [
-      [cards[0], rev], [cards[1], gm], [cards[2], burn], [cards[3], cash],
-    ]
-    for (const [card, k] of pairs) {
-      if (!card || !k) continue
-      const v = card.querySelector<HTMLElement>('.kpi-v')
-      if (v) v.innerHTML = `${fmtNum(Number(k.value))}<em>${escapeHtml(k.unit ?? '')}</em>`
-      const lbl = card.querySelector<HTMLElement>('.kpi-lbl')
-      if (lbl) lbl.textContent = k.name
+    type Fin = { id: string; period: string; revenue: number; cogs: number; opex_sales: number; opex_rnd: number; opex_ga: number; other_income: number; capex: number; cash_balance?: number; accounts_receivable?: number; inventory?: number; accounts_payable?: number }
+    const ebitdaOf = (f: Fin) => f.revenue - f.cogs - f.opex_sales - f.opex_rnd - f.opex_ga + f.other_income
+    const render = (list: Fin[]) => {
+      const cur = list[0]
+      const gm = cur && cur.revenue > 0 ? ((cur.revenue - cur.cogs) / cur.revenue) * 100 : 0
+      patchKpiCards(root, [
+        { value: cur ? fmtMoney(cur.revenue) : '—', label: 'Doanh thu tháng', sub: cur ? String(cur.period).slice(0, 7) : 'chưa có dữ liệu' },
+        { value: cur ? `${gm.toFixed(1)}<em>%</em>` : '—', label: 'Gross margin' },
+        { value: cur ? fmtMoney(ebitdaOf(cur)) : '—', label: 'EBITDA' },
+        { value: cur?.cash_balance != null ? fmtMoney(cur.cash_balance) : '—', label: 'Cash cuối kỳ' },
+      ])
+      const rows = list.slice(0, 24).map((f) => {
+        const e = ebitdaOf(f)
+        return `<tr><td><strong>${String(f.period).slice(0, 7)}</strong></td><td class="num">${fmtMoney(f.revenue)}</td><td class="num">${fmtMoney(f.revenue - f.cogs)}</td><td class="num" style="color:${e >= 0 ? 'var(--ok,#4fc79a)' : 'var(--err,#e0685f)'}">${fmtMoney(e)}</td><td class="num">${f.cash_balance != null ? fmtMoney(f.cash_balance) : '—'}</td></tr>`
+      })
+      patchTable(root, '.card', rows, 'Chưa có tháng tài chính. Bấm "+ Tháng" nhập P&L đầu tiên — mọi KPI sẽ tự dẫn xuất từ đây.', 5)
     }
+    const refresh = async () => { const r = await apiSend('/api/financials', 'GET'); if (r.ok) render((r.data as Fin[]) ?? []) }
+    render(((raw as { data?: Fin[] })?.data) ?? [])
+
+    // Panel kết quả hàm khớp (tạo 1 lần).
+    let panel = root.querySelector<HTMLElement>('#fin-derive-panel')
+    if (!panel) {
+      panel = document.createElement('div')
+      panel.id = 'fin-derive-panel'
+      panel.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02));display:none'
+      const kpiRow = root.querySelector('.kpi-row')
+      if (kpiRow?.parentNode) kpiRow.parentNode.insertBefore(panel, kpiRow.nextSibling)
+      else root.appendChild(panel)
+    }
+    const box = panel
+
+    ensureHeaderButton(root, 'za-add-month', '+ Tháng', async () => {
+      const now = new Date()
+      const defPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const v = await openFormModal({
+        title: 'Nhập P&L + cashflow tháng',
+        fields: [
+          { name: 'period', label: 'Tháng (YYYY-MM)', required: true, value: defPeriod },
+          { name: 'revenue', label: 'Doanh thu', type: 'number', required: true },
+          { name: 'cogs', label: 'COGS (giá vốn)', type: 'number' },
+          { name: 'opex_sales', label: 'OPEX · Sales & Marketing', type: 'number' },
+          { name: 'opex_rnd', label: 'OPEX · R&D', type: 'number' },
+          { name: 'opex_ga', label: 'OPEX · G&A', type: 'number' },
+          { name: 'other_income', label: 'Thu nhập khác', type: 'number' },
+          { name: 'capex', label: 'CAPEX', type: 'number' },
+          { name: 'cash_balance', label: 'Cash cuối tháng', type: 'number' },
+          { name: 'accounts_receivable', label: 'Phải thu (AR)', type: 'number' },
+          { name: 'inventory', label: 'Tồn kho', type: 'number' },
+          { name: 'accounts_payable', label: 'Phải trả (AP)', type: 'number' },
+        ],
+        submitLabel: 'Lưu tháng',
+      })
+      if (!v) return
+      const res = await apiSend('/api/financials', 'POST', {
+        period: v.period, revenue: num(v.revenue) ?? 0, cogs: num(v.cogs) ?? 0,
+        opex_sales: num(v.opex_sales) ?? 0, opex_rnd: num(v.opex_rnd) ?? 0, opex_ga: num(v.opex_ga) ?? 0,
+        other_income: num(v.other_income) ?? 0, capex: num(v.capex) ?? 0,
+        cash_balance: num(v.cash_balance), accounts_receivable: num(v.accounts_receivable),
+        inventory: num(v.inventory), accounts_payable: num(v.accounts_payable),
+      })
+      if (res.ok) { toast('Đã lưu tháng'); void refresh() } else toast(res.error ?? 'Lỗi lưu', 'err')
+    })
+
+    ensureHeaderButton(root, 'za-derive', '🔄 Hàm khớp KPI ↔ Vốn', async () => {
+      box.style.display = 'block'
+      box.innerHTML = `<div style="color:var(--dim);padding:8px">Đang chạy hàm dẫn xuất: P&L → KPI → đối chiếu gọi vốn…</div>`
+      const r = await apiSend('/api/financials/derive', 'POST', {})
+      if (!r.ok) { box.innerHTML = `<div style="color:var(--err,#e0685f);padding:8px">${escapeHtml(r.error ?? 'Lỗi hàm khớp')}</div>`; return }
+      const d = r.data as { financial: Record<string, number | string | null>; funding: { burn_avg_3m: number; cash_need_usd: number; open_target_usd: number; runway_months: number | null; open_rounds: Array<{ round_name: string; status: string; target_raise_usd: number }> }; mismatches: Array<{ severity: string; message: string }> }
+      const f = d.financial; const fu = d.funding
+      const sevColor = (s: string) => (s === 'critical' ? 'var(--err,#e0685f)' : s === 'warn' ? 'var(--gold,#e4c16e)' : 'var(--dim)')
+      box.innerHTML = `
+        <strong>🔄 Kết quả hàm khớp — kỳ ${escapeHtml(String(f.period ?? ''))}</strong>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0">
+          ${[
+            ['GM', `${f.gross_margin_pct}%`], ['EBITDA', fmtMoney(Number(f.ebitda ?? 0))],
+            ['Burn TB 3T', fmtMoney(Number(fu.burn_avg_3m ?? 0))], ['Runway', fu.runway_months != null ? `${fu.runway_months} tháng` : '—'],
+            ['CCC', `${f.ccc_days} ngày (DSO ${f.dso}·DIO ${f.dio}·DPO ${f.dpo})`],
+            ['Cần vốn (hàm)', fmtMoney(fu.cash_need_usd)], ['Round đang mở', fmtMoney(fu.open_target_usd)],
+          ].map(([l, v2]) => `<div style="padding:8px;border:1px solid var(--line,#2a2a3f);border-radius:8px"><div style="font-size:.65rem;color:var(--dim);text-transform:uppercase">${l}</div><strong>${v2}</strong></div>`).join('')}
+        </div>
+        <div style="font-size:.8rem;color:var(--ok,#4fc79a)">✓ 11 KPI tài chính đã tự cập nhật vào KPI Matrix (category finance_derived) — mọi dashboard giờ khớp với P&L.</div>
+        ${d.mismatches.length ? `<div style="margin-top:10px"><strong>⚠ Lệch cần xử lý:</strong>${d.mismatches.map((m) => `<div style="margin-top:6px;padding:8px;border-left:3px solid ${sevColor(m.severity)};background:rgba(255,255,255,.02);font-size:.82rem">${escapeHtml(m.message)}</div>`).join('')}</div>` : `<div style="margin-top:8px;color:var(--ok,#4fc79a)">✓ Không có lệch giữa P&L ↔ KPI ↔ chiến lược gọi vốn.</div>`}`
+      toast('Hàm khớp đã chạy — KPI đồng bộ')
+    })
   },
 
   'page-ipo': async (raw) => {
@@ -439,20 +507,87 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-roadmap': (raw) => {
     const root = document.getElementById('page-roadmap')
     if (!root) return
-    const d = raw as { data?: Array<{ id: string; current_phase?: string; name?: string; target_year?: number }> }
-    const journey = d?.data?.[0]
-    if (!journey) return
-    const cards = root.querySelectorAll<HTMLElement>('.kpi-row .kpi-card .kpi-v')
-    if (cards.length >= 4) {
-      if (journey.current_phase) cards[0].innerHTML = `${escapeHtml(String(journey.current_phase))}<em></em>`
-      if (journey.target_year) {
-        const target = new Date(journey.target_year, 11, 31).getTime()
-        const days = Math.max(0, Math.round((target - Date.now()) / 86_400_000))
-        cards[3].textContent = fmtNum(days)
-      }
+    type Gate = { key: string; label: string; pass: boolean }
+    type Phase = { phase: number; title: string; mission: string; dashboard_focus?: string; gates: Gate[]; gates_passed: number; gates_total: number; status: 'done' | 'current' | 'upcoming' }
+    type Road = { journey?: { current_phase: number; north_star_metric?: string; valuation_target?: number; target_year?: number } | null; phases?: Phase[]; snapshot?: { readiness?: number; runway?: number | null; finMonths?: number } }
+    const BMC_LABELS: Record<string, string> = {
+      customer_segments: '👥 Phân khúc KH', value_propositions: '💎 Giá trị cốt lõi', channels: '📣 Kênh',
+      customer_relationships: '🤝 Quan hệ KH', revenue_streams: '💰 Dòng doanh thu', key_resources: '🔑 Nguồn lực',
+      key_activities: '⚙ Hoạt động chính', key_partnerships: '🧩 Đối tác', cost_structure: '🧾 Cơ cấu chi phí',
     }
-    const subs = root.querySelectorAll<HTMLElement>('.kpi-row .kpi-card .kpi-sub')
-    if (subs.length >= 1 && journey.current_phase) subs[0].textContent = `${journey.current_phase} active`
+    const render = (d: Road) => {
+      const phases = d.phases ?? []
+      const cur = phases.find((p) => p.status === 'current')
+      patchKpiCards(root, [
+        { value: `${d.journey?.current_phase ?? 1}<em>/10</em>`, label: 'Bước hiện tại', sub: cur?.title ?? '' },
+        { value: cur ? `${cur.gates_passed}/${cur.gates_total}` : '—', label: 'Gates bước này', sub: 'đạt đủ để lên bước' },
+        { value: String(d.snapshot?.readiness ?? 0), label: 'IPO Readiness' },
+        { value: d.journey?.target_year ? String(d.journey.target_year) : '—', label: 'Năm mục tiêu', sub: d.journey?.north_star_metric ? `NSM: ${d.journey.north_star_metric}` : '' },
+      ])
+      // Panel 10 bước (tạo/refresh).
+      let panel = root.querySelector<HTMLElement>('#roadmap-phases')
+      if (!panel) {
+        panel = document.createElement('div')
+        panel.id = 'roadmap-phases'
+        panel.style.cssText = 'margin:14px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px'
+        const kpiRow = root.querySelector('.kpi-row')
+        if (kpiRow?.parentNode) kpiRow.parentNode.insertBefore(panel, kpiRow.nextSibling)
+        else root.appendChild(panel)
+      }
+      panel.innerHTML = phases.map((p) => {
+        const border = p.status === 'current' ? 'var(--gold,#e4c16e)' : p.status === 'done' ? 'var(--ok,#4fc79a)' : 'var(--line,#2a2a3f)'
+        const badge = p.status === 'current' ? '● ĐANG Ở ĐÂY' : p.status === 'done' ? '✓ XONG' : ''
+        return `<div style="border:1px solid ${border};border-radius:12px;padding:12px;background:var(--panel,rgba(255,255,255,.02))">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+            <strong>${p.phase}. ${escapeHtml(String(p.title))}</strong>
+            <span style="font-size:.62rem;color:${border};font-weight:700;white-space:nowrap">${badge}</span>
+          </div>
+          <div style="font-size:.75rem;color:var(--ink-2,#b3b2aa);margin:6px 0">${escapeHtml(String(p.mission))}</div>
+          <div style="font-size:.72rem;margin-top:6px">${p.gates.map((g) => `<div style="margin-top:3px;color:${g.pass ? 'var(--ok,#4fc79a)' : 'var(--dim,#737b8e)'}">${g.pass ? '✓' : '○'} ${escapeHtml(g.label)}</div>`).join('')}</div>
+          ${p.dashboard_focus ? `<div style="font-size:.62rem;color:var(--dim);margin-top:8px;text-transform:uppercase;letter-spacing:.04em">📊 ${escapeHtml(String(p.dashboard_focus))}</div>` : ''}
+        </div>`
+      }).join('')
+    }
+    render(((raw as { data?: Road })?.data) ?? {})
+    const refreshRoad = async () => { const r = await apiSend('/api/roadmap', 'GET'); if (r.ok) render(r.data as Road) }
+
+    // ── BMC editor panel (bước 1 — nhập idea) ──
+    let bmc = root.querySelector<HTMLElement>('#bmc-panel')
+    if (!bmc) {
+      bmc = document.createElement('div')
+      bmc.id = 'bmc-panel'
+      bmc.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02))'
+      const phasesPanel = root.querySelector('#roadmap-phases')
+      if (phasesPanel?.parentNode) phasesPanel.parentNode.insertBefore(bmc, phasesPanel.nextSibling)
+      else root.appendChild(bmc)
+    }
+    const bmcBox = bmc
+    const renderBmc = async () => {
+      const r = await apiSend('/api/canvas', 'GET')
+      if (!r.ok) { bmcBox.innerHTML = `<div style="color:var(--dim)">Business Model Canvas: ${escapeHtml(r.error ?? 'chưa tải được (cần migration 025)')}</div>`; return }
+      const blocks = (r.data as { blocks?: Array<{ block_key: string; items: string[] }> })?.blocks ?? []
+      bmcBox.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><strong>🗺 Business Model Canvas — vòng nhập IDEA (bấm khối để sửa)</strong><span style="font-size:.72rem;color:var(--dim)">${blocks.filter((b) => b.items.length > 0).length}/9 khối có nội dung</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+        ${blocks.map((b) => `<div data-bmc="${b.block_key}" style="border:1px solid ${b.items.length ? 'var(--ok,#4fc79a)' : 'var(--line,#2a2a3f)'};border-radius:10px;padding:10px;cursor:pointer;min-height:84px">
+          <div style="font-size:.7rem;font-weight:700;margin-bottom:5px">${BMC_LABELS[b.block_key] ?? b.block_key}</div>
+          ${b.items.length ? b.items.slice(0, 4).map((i) => `<div style="font-size:.72rem;color:var(--ink-2,#b3b2aa)">• ${escapeHtml(i)}</div>`).join('') : '<div style="font-size:.7rem;color:var(--dim);font-style:italic">trống — bấm để nhập</div>'}
+        </div>`).join('')}</div>`
+      wireEach(bmcBox, '[data-bmc]', async (el) => {
+        const key = el.getAttribute('data-bmc')
+        if (!key) return
+        const blk = blocks.find((b) => b.block_key === key)
+        const v = await openFormModal({
+          title: `${BMC_LABELS[key] ?? key} — mỗi dòng 1 ý`,
+          fields: [{ name: 'items', label: 'Nội dung (mỗi dòng 1 ý)', type: 'textarea', value: (blk?.items ?? []).join('\n') }],
+          submitLabel: 'Lưu khối',
+        })
+        if (!v) return
+        const items = String(v.items ?? '').split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 20)
+        const res = await apiSend('/api/canvas', 'POST', { block_key: key, items })
+        if (res.ok) { toast('Đã lưu khối BMC'); void renderBmc(); void refreshRoad() } else toast(res.error ?? 'Lỗi lưu', 'err')
+      })
+    }
+    void renderBmc()
   },
 
   'page-agents': (raw) => {
