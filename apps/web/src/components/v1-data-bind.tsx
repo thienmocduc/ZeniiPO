@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { openFormModal, apiSend, toast, num, wireButtonByText, wireEach, ensureHeaderButton, type Field } from '@/components/v1-actions'
+import { openFormModal, apiSend, toast, num, wireButtonByText, wireClick, wireEach, ensureHeaderButton, type Field } from '@/components/v1-actions'
 
 type Json = Record<string, unknown> | null
 
@@ -960,21 +960,132 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
     })
   },
 
-  'page-datafow': (raw) => {
+  'page-datafow': () => {
     const root = document.getElementById('page-datafow')
     if (!root) return
-    const d = (raw as { data?: { events?: Array<{ event_type: string; created_at: string }>; by_type?: Record<string, number> } })?.data
-    const events = d?.events ?? []
-    const by = d?.by_type ?? {}
-    const types = Object.keys(by)
-    patchKpiCards(root, [
-      { value: String(events.length), label: 'Events' },
-      { value: String(types.length), label: 'Types' },
-      { value: String(by.cascade ?? 0), label: 'Cascades' },
-      { value: String(by.round_closed ?? 0), label: 'Round closures' },
-    ])
-    const rows = events.slice(0, 25).map((e) => `<tr><td><strong>${escapeHtml(e.event_type)}</strong></td><td>${fmtDate(e.created_at)}</td><td>—</td><td><span class="st info">recorded</span></td></tr>`)
-    patchTable(root, '.card', rows, 'Chưa có event. Trigger sẽ ghi events khi có hoạt động.', 4)
+    type Conn = { id: string; provider: string; name: string; status: string; token_hint?: string; last_sync_at?: string; last_sync_status?: string; total_rows_ingested?: number }
+    type Mapping = { id: string; connector_id: string; source_object: string; target_table: string }
+    type Run = { id: string; connector_id: string; target_table?: string; rows_received: number; rows_written: number; rows_rejected: number; status: string; started_at: string }
+    type Payload = { connectors?: Conn[]; mappings?: Mapping[]; runs?: Run[]; target_tables?: string[]; summary?: { total: number; active: number; rows_total: number } }
+    const PROVIDER_VI: Record<string, string> = {
+      google_sheets: 'Google Sheets', google_workspace: 'Google Workspace', larksuite: 'Larksuite',
+      misa: 'MISA', zenidigital: 'zenidigital.io', zeni_cloud: 'ZeniCloud Automation',
+      csv_upload: 'Tải CSV', webhook: 'Webhook', api: 'API tuỳ biến',
+    }
+    const TABLE_VI: Record<string, string> = {
+      financial_statements: 'Báo cáo tài chính (P&L)', unit_economics_inputs: 'Khách hàng & MRR',
+      kpi_metrics: 'KPI', tasks: 'Công việc', investor_pipeline: 'Nhà đầu tư',
+      compliance_items: 'Hồ sơ pháp lý', market_data: 'Dữ liệu thị trường', comparables: 'Công ty so sánh',
+    }
+    const render = (p: Payload) => {
+      const conns = p.connectors ?? []
+      const maps = p.mappings ?? []
+      const runs = p.runs ?? []
+      const s = p.summary
+      patchKpiCards(root, [
+        { value: String(s?.total ?? conns.length), label: 'Kết nối dữ liệu' },
+        { value: String(s?.active ?? 0), label: 'Đang hoạt động' },
+        { value: fmtNum(s?.rows_total ?? 0), label: 'Dòng đã nạp' },
+        { value: String(maps.length), label: 'Ánh xạ nguồn→bảng' },
+      ])
+      const rows = conns.map((c) => {
+        const ms = maps.filter((m) => m.connector_id === c.id)
+        const cls = c.status === 'active' ? 'ok' : c.status === 'error' ? 'err' : 'warn'
+        return `<tr><td><strong>${escapeHtml(c.name)}</strong><br/><span style="font-size:.62rem;color:var(--dim)">${escapeHtml(PROVIDER_VI[c.provider] ?? c.provider)}${c.token_hint ? ` · token …${escapeHtml(c.token_hint)}` : ''}</span><button data-del="${c.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${ms.length ? ms.map((m) => `${escapeHtml(m.source_object)} → ${escapeHtml(TABLE_VI[m.target_table] ?? m.target_table)}`).join('<br/>') : '<span style="color:var(--dim)">chưa ánh xạ</span>'}<button data-map="${c.id}" style="background:none;border:0;color:var(--gold,#e4c16e);cursor:pointer;font-size:.66rem;padding:0;display:block;margin-top:3px">+ thêm ánh xạ</button></td><td class="num">${fmtNum(c.total_rows_ingested ?? 0)}</td><td>${c.last_sync_at ? fmtDate(c.last_sync_at) : '—'}</td><td><span class="st ${cls}">${escapeHtml(c.status)}</span></td></tr>`
+      })
+      patchTable(root, '.card', rows, 'Chưa có kết nối nào. Bấm "+ Kết nối dữ liệu" để đấu nối Google Sheets · Larksuite · MISA · zenidigital.io — số liệu tự chảy về Zeni-iPO.', 5)
+
+      // Nhật ký nạp gần nhất (minh bạch, đối soát được)
+      let log = root.querySelector<HTMLElement>('#sync-log')
+      if (!log) {
+        log = document.createElement('div')
+        log.id = 'sync-log'
+        log.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02))'
+        root.appendChild(log)
+      }
+      log.innerHTML = `<strong style="font-size:.85rem">📥 Nhật ký nạp dữ liệu gần nhất</strong>${
+        runs.length === 0
+          ? `<div style="color:var(--dim);font-style:italic;margin-top:8px;font-size:.82rem">Chưa có lần nạp nào.</div>`
+          : `<div style="overflow-x:auto;margin-top:8px"><table class="tbl" style="width:100%"><thead><tr><th>Thời điểm</th><th>Bảng đích</th><th>Nhận</th><th>Ghi</th><th>Từ chối</th><th>Kết quả</th></tr></thead><tbody>${runs.slice(0, 12).map((r) => `<tr><td>${fmtDate(r.started_at)}</td><td>${escapeHtml(TABLE_VI[r.target_table ?? ''] ?? r.target_table ?? '—')}</td><td class="num">${r.rows_received}</td><td class="num" style="color:var(--ok,#4fc79a)">${r.rows_written}</td><td class="num" style="color:${r.rows_rejected > 0 ? 'var(--err,#e0685f)' : 'var(--dim)'}">${r.rows_rejected}</td><td><span class="st ${r.status === 'success' ? 'ok' : r.status === 'failed' ? 'err' : 'warn'}">${escapeHtml(r.status)}</span></td></tr>`).join('')}</tbody></table></div>`
+      }`
+
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá kết nối này? Token sẽ ngừng hoạt động ngay.')) return
+        const r = await apiSend(`/api/connectors/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá kết nối'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+      wireEach(root, 'button[data-map]', async (el) => {
+        const id = el.getAttribute('data-map')
+        if (!id) return
+        const v = await openFormModal({
+          title: 'Thêm ánh xạ nguồn → bảng Zeni',
+          fields: [
+            { name: 'source_object', label: 'Tên nguồn (sheet/bảng bên hệ thống kia)', required: true, placeholder: 'PL_2026 / Bang_Ke_Doanh_Thu' },
+            { name: 'target_table', label: 'Đổ vào bảng', type: 'select', required: true, options: (p.target_tables ?? Object.keys(TABLE_VI)).map((t) => ({ value: t, label: TABLE_VI[t] ?? t })) },
+            { name: 'field_map', label: 'Ánh xạ cột (mỗi dòng: cột nguồn = cột đích)', type: 'textarea', placeholder: 'Kỳ = period\nDoanh thu = revenue\nGiá vốn = cogs' },
+          ],
+          submitLabel: 'Lưu ánh xạ',
+        })
+        if (!v) return
+        const fm: Record<string, string> = {}
+        String(v.field_map ?? '').split('\n').forEach((line) => {
+          const i = line.indexOf('=')
+          if (i > 0) fm[line.slice(0, i).trim()] = line.slice(i + 1).trim()
+        })
+        const r = await apiSend(`/api/connectors/${id}/mappings`, 'POST', {
+          source_object: v.source_object, target_table: v.target_table, field_map: fm,
+        })
+        if (r.ok) { toast('Đã lưu ánh xạ'); void refresh() } else toast(r.error ?? 'Lỗi', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/connectors', 'GET'); if (r.ok) render(r.data as Payload) }
+    void refresh()
+
+    ensureHeaderButton(root, 'za-add-conn', '+ Kết nối dữ liệu', async () => {
+      const v = await openFormModal({
+        title: 'Đấu nối dữ liệu từ hệ thống ngoài',
+        fields: [
+          { name: 'name', label: 'Tên kết nối', required: true, placeholder: 'Sổ kế toán MISA 2026' },
+          { name: 'provider', label: 'Nguồn dữ liệu', type: 'select', required: true, options: Object.entries(PROVIDER_VI).map(([v2, l]) => ({ value: v2, label: l })) },
+          { name: 'source_object', label: 'Tên nguồn đầu tiên (tuỳ chọn)', placeholder: 'PL_2026' },
+          { name: 'target_table', label: 'Đổ vào bảng (tuỳ chọn)', type: 'select', options: [{ value: '', label: '— Cấu hình sau —' }, ...Object.entries(TABLE_VI).map(([v2, l]) => ({ value: v2, label: l }))] },
+          { name: 'field_map', label: 'Ánh xạ cột (mỗi dòng: cột nguồn = cột đích)', type: 'textarea', placeholder: 'Kỳ = period\nDoanh thu = revenue' },
+        ],
+        submitLabel: 'Tạo kết nối',
+      })
+      if (!v) return
+      const fm: Record<string, string> = {}
+      String(v.field_map ?? '').split('\n').forEach((line) => {
+        const i = line.indexOf('=')
+        if (i > 0) fm[line.slice(0, i).trim()] = line.slice(i + 1).trim()
+      })
+      const res = await apiSend('/api/connectors', 'POST', {
+        name: v.name, provider: v.provider,
+        source_object: v.source_object || undefined,
+        target_table: v.target_table || undefined,
+        field_map: Object.keys(fm).length ? fm : undefined,
+      })
+      if (!res.ok) { toast(res.error ?? 'Lỗi tạo kết nối', 'err'); return }
+      const d = res.data as { ingest_token: string; setup_hint?: string }
+      const origin = window.location.origin
+      await openFormModal({
+        title: '🔑 Token nạp dữ liệu — LƯU NGAY (chỉ hiện một lần)',
+        fields: [{
+          name: 'token', label: 'Dán đoạn này vào hệ thống nguồn', type: 'textarea',
+          value: `ENDPOINT: ${origin}/api/ingest
+HEADER:   X-Zeni-Ingest-Token: ${d.ingest_token}
+BODY:     {"source_object":"${v.source_object || '<tên nguồn>'}","rows":[{...}]}
+
+Mẹo: thêm "dry_run": true để thử ánh xạ mà chưa ghi vào hệ thống.
+
+${d.setup_hint ?? ''}`,
+        }],
+        submitLabel: 'Đã lưu',
+      })
+      toast('Đã tạo kết nối')
+      void refresh()
+    })
   },
 
   'page-team': (raw) => {
@@ -2090,11 +2201,161 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
     const p = d?.profile
     const t = d?.tenant
     patchKpiCards(root, [
-      { value: p?.full_name ?? a?.email ?? '—', label: 'Account' },
-      { value: p?.role ?? '—', label: 'Role' },
-      { value: t?.name ?? '—', label: 'Tenant' },
-      { value: t?.plan ?? 'free', label: 'Plan' },
+      { value: p?.full_name ?? a?.email ?? '—', label: 'Tài khoản' },
+      { value: p?.role ?? '—', label: 'Vai trò' },
+      { value: t?.name ?? '—', label: 'Doanh nghiệp' },
+      { value: t?.plan ?? 'free', label: 'Gói' },
     ])
+
+    // ── CHẾ ĐỘ VẬN HÀNH + CHẨN ĐOÁN TÁI CẤU TRÚC + GIẢ LẬP ──
+    type Prof = { mode: string; data_source?: string; company_stage?: string; industry?: string; baseline_revenue?: number; baseline_employees?: number }
+    type ProfPayload = { profile?: Prof; guide?: { title: string; next_steps: string[] }; modes?: Array<{ mode: string; title: string }> }
+    const MODE_ICON: Record<string, string> = { startup: '🚀', restructure: '🏗', simulation: '🎮', live_ops: '🔗' }
+
+    let panel = root.querySelector<HTMLElement>('#mode-panel')
+    if (!panel) {
+      panel = document.createElement('div')
+      panel.id = 'mode-panel'
+      panel.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02))'
+      const kpiRow = root.querySelector('.kpi-row')
+      if (kpiRow?.parentNode) kpiRow.parentNode.insertBefore(panel, kpiRow.nextSibling)
+      else root.appendChild(panel)
+    }
+    const box = panel
+    let out = root.querySelector<HTMLElement>('#mode-output')
+    if (!out) {
+      out = document.createElement('div')
+      out.id = 'mode-output'
+      out.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02));display:none'
+      box.parentNode?.insertBefore(out, box.nextSibling)
+    }
+    const outBox = out
+
+    const renderMode = (d: ProfPayload) => {
+      const prof = d.profile
+      const modes = d.modes ?? []
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <strong>⚙️ Chế độ vận hành nền tảng</strong>
+          <span style="font-size:.75rem;color:var(--dim)">nguồn dữ liệu: ${escapeHtml(prof?.data_source ?? 'manual')}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px">
+          ${modes.map((m) => `<button data-mode="${m.mode}" style="text-align:left;padding:10px;border:1px solid ${prof?.mode === m.mode ? 'var(--gold,#e4c16e)' : 'var(--line,#2a2a3f)'};border-radius:10px;background:${prof?.mode === m.mode ? 'rgba(228,193,110,.08)' : 'transparent'};color:var(--ink,#ece9e0);cursor:pointer">
+            <div style="font-size:1.1rem">${MODE_ICON[m.mode] ?? '•'}</div>
+            <div style="font-weight:700;font-size:.82rem;margin-top:3px">${escapeHtml(m.title)}</div>
+            ${prof?.mode === m.mode ? '<div style="font-size:.62rem;color:var(--gold,#e4c16e);margin-top:3px">● ĐANG DÙNG</div>' : ''}
+          </button>`).join('')}
+        </div>
+        ${d.guide ? `<div style="margin-top:10px;font-size:.8rem"><strong>Việc tiếp theo cho chế độ này:</strong>${d.guide.next_steps.map((s2) => `<div style="margin-top:3px;color:var(--ink-2,#b3b2aa)">→ ${escapeHtml(s2)}</div>`).join('')}</div>` : ''}
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="za-diagnose" class="btn btn-pri" style="padding:7px 14px;border-radius:8px;border:0;background:var(--gold,#e4c16e);color:#0c0a08;font-weight:700;cursor:pointer;font-size:.8rem">🏗 Chẩn đoán tái cấu trúc</button>
+          <button id="za-simulate" class="btn btn-sec" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line,#2a2a3f);background:transparent;color:var(--ink,#ece9e0);cursor:pointer;font-size:.8rem">🎮 Chạy giả lập điều hành</button>
+        </div>`
+
+      wireEach(box, 'button[data-mode]', async (el) => {
+        const mode = el.getAttribute('data-mode')
+        if (!mode) return
+        const r = await apiSend('/api/tenant-profile', 'POST', { mode })
+        if (r.ok) { toast(`Đã chuyển chế độ: ${mode}`); void refreshMode() } else toast(r.error ?? 'Lỗi', 'err')
+      })
+
+      wireClick(box, '#za-diagnose', async () => {
+        outBox.style.display = 'block'
+        outBox.innerHTML = `<div style="color:var(--dim);padding:8px">Đang chấm 8 trụ doanh nghiệp so chuẩn công ty niêm yết…</div>`
+        const r = await apiSend('/api/restructure/diagnose', 'POST', {})
+        if (!r.ok) { outBox.innerHTML = `<div style="color:var(--err,#e0685f);padding:8px">${escapeHtml(r.error ?? 'Lỗi chẩn đoán')}</div>`; return }
+        const d2 = r.data as {
+          overall_score: number; max_score: number; grade: string; delta: number | null
+          pillars: Array<{ key: string; name: string; score: number; max: number; findings: string[]; actions: string[] }>
+          priorities: Array<{ name: string; gap_pct: number }>
+        }
+        const col = d2.overall_score >= 85 ? 'var(--ok,#4fc79a)' : d2.overall_score >= 65 ? 'var(--gold,#e4c16e)' : 'var(--err,#e0685f)'
+        outBox.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <strong>🏗 Chẩn đoán tái cấu trúc theo chuẩn IPO</strong>
+            <span>Điểm: <strong style="color:${col};font-size:1.15rem">${d2.overall_score}/${d2.max_score}</strong> — ${escapeHtml(d2.grade)}${d2.delta != null ? ` <span style="font-size:.72rem;color:${d2.delta >= 0 ? 'var(--ok,#4fc79a)' : 'var(--err,#e0685f)'}">(${d2.delta >= 0 ? '+' : ''}${d2.delta} so lần trước)</span>` : ''}</span>
+          </div>
+          ${d2.priorities?.length ? `<div style="margin-bottom:10px;font-size:.82rem"><strong>Ưu tiên xử lý:</strong> ${d2.priorities.map((p2) => `${escapeHtml(p2.name)} (thiếu ${p2.gap_pct}%)`).join(' · ')}</div>` : ''}
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+            ${d2.pillars.map((p2) => {
+              const pct = p2.max > 0 ? Math.round((p2.score / p2.max) * 100) : 0
+              const c2 = pct >= 80 ? 'var(--ok,#4fc79a)' : pct >= 50 ? 'var(--gold,#e4c16e)' : 'var(--err,#e0685f)'
+              return `<div style="border:1px solid var(--line,#2a2a3f);border-radius:10px;padding:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center"><strong style="font-size:.85rem">${escapeHtml(p2.name)}</strong><span style="color:${c2};font-weight:700;font-size:.8rem">${p2.score}/${p2.max}</span></div>
+                <div style="height:4px;background:var(--line,#2a2a3f);border-radius:2px;margin:6px 0"><div style="height:100%;width:${pct}%;background:${c2};border-radius:2px"></div></div>
+                ${(p2.findings ?? []).map((f) => `<div style="font-size:.74rem;color:var(--ink-2,#b3b2aa);margin-top:3px">• ${escapeHtml(f)}</div>`).join('')}
+                ${(p2.actions ?? []).map((ac) => `<div style="font-size:.74rem;color:var(--gold,#e4c16e);margin-top:3px">→ ${escapeHtml(ac)}</div>`).join('')}
+              </div>`
+            }).join('')}
+          </div>`
+        toast(`Chẩn đoán: ${d2.overall_score}/100 — ${d2.grade}`)
+      })
+
+      wireClick(box, '#za-simulate', async () => {
+        const v = await openFormModal({
+          title: 'Giả lập điều hành công ty',
+          fields: [
+            { name: 'name', label: 'Tên kịch bản', value: 'Kịch bản tăng trưởng' },
+            { name: 'months', label: 'Số tháng mô phỏng', type: 'number', value: '24' },
+            { name: 'new_customers_month1', label: 'Khách mới tháng đầu', type: 'number', value: '20' },
+            { name: 'new_customer_growth_pct', label: 'Tăng trưởng khách mới %/tháng', type: 'number', value: '10' },
+            { name: 'arpu', label: 'Doanh thu/khách/tháng', type: 'number', value: '500' },
+            { name: 'churn_pct', label: 'Churn %/tháng', type: 'number', value: '3' },
+            { name: 'gross_margin_pct', label: 'Biên gộp %', type: 'number', value: '70' },
+            { name: 'cac', label: 'CAC (chi phí có 1 khách)', type: 'number', value: '400' },
+            { name: 'starting_cash', label: 'Tiền mặt ban đầu', type: 'number', value: '500000' },
+            { name: 'materialize', label: 'Ghi vào hệ thống để điều hành thật? (co/khong)', value: 'co' },
+          ],
+          submitLabel: 'Chạy giả lập',
+        })
+        if (!v) return
+        outBox.style.display = 'block'
+        outBox.innerHTML = `<div style="color:var(--dim);padding:8px">Đang mô phỏng…</div>`
+        const r = await apiSend('/api/simulation/run', 'POST', {
+          name: v.name || 'Kịch bản giả lập',
+          months: num(v.months) ?? 24,
+          materialize: /^(co|có|yes|true|1)$/i.test(String(v.materialize ?? '')),
+          assumptions: {
+            new_customers_month1: num(v.new_customers_month1) ?? 20,
+            new_customer_growth_pct: num(v.new_customer_growth_pct) ?? 10,
+            arpu: num(v.arpu) ?? 500, churn_pct: num(v.churn_pct) ?? 3,
+            gross_margin_pct: num(v.gross_margin_pct) ?? 70, cac: num(v.cac) ?? 400,
+            starting_cash: num(v.starting_cash) ?? 500000,
+          },
+        })
+        if (!r.ok) { outBox.innerHTML = `<div style="color:var(--err,#e0685f);padding:8px">${escapeHtml(r.error ?? 'Lỗi giả lập')}</div>`; return }
+        const d3 = r.data as {
+          name: string; months: number; materialized_rows: number
+          summary: { final_customers: number; final_mrr: number; final_arr: number; peak_headcount: number; total_funding: number; months_to_breakeven: number | null; lowest_cash: number; ran_out_of_cash_month: number | null; ltv: number | null; ltv_cac: number | null; cac_payback_months: number | null }
+          series: Array<{ month: number; customers: number; revenue: number; ebitda: number; cash: number; headcount: number }>
+        }
+        const su = d3.summary
+        const cards = [
+          ['Khách cuối kỳ', fmtNum(su.final_customers)], ['ARR cuối kỳ', fmtMoney(su.final_arr)],
+          ['Nhân sự đỉnh', fmtNum(su.peak_headcount)], ['Vốn phải gọi', fmtMoney(su.total_funding)],
+          ['Hoà vốn tháng', su.months_to_breakeven != null ? `T${su.months_to_breakeven}` : 'chưa'],
+          ['Tiền thấp nhất', fmtMoney(su.lowest_cash)],
+          ['LTV:CAC', su.ltv_cac != null ? `${su.ltv_cac}×` : '—'],
+          ['CAC payback', su.cac_payback_months != null ? `${su.cac_payback_months} th` : '—'],
+        ]
+        const step = Math.max(1, Math.ceil(d3.series.length / 12))
+        outBox.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <strong>🎮 ${escapeHtml(d3.name)} — ${d3.months} tháng</strong>
+            ${su.ran_out_of_cash_month != null ? `<span style="color:var(--err,#e0685f);font-weight:700">⚠ HẾT TIỀN ở tháng ${su.ran_out_of_cash_month}</span>` : `<span style="color:var(--ok,#4fc79a)">✓ Không đứt dòng tiền</span>`}
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px">
+            ${cards.map(([l, v2]) => `<div style="padding:8px;border:1px solid var(--line,#2a2a3f);border-radius:8px"><div style="font-size:.62rem;color:var(--dim);text-transform:uppercase">${l}</div><strong>${v2}</strong></div>`).join('')}
+          </div>
+          <div style="overflow-x:auto"><table class="tbl" style="width:100%"><thead><tr><th>Tháng</th><th>Khách</th><th>Doanh thu</th><th>EBITDA</th><th>Tiền mặt</th><th>Nhân sự</th></tr></thead><tbody>
+            ${d3.series.filter((_, i) => i % step === 0 || i === d3.series.length - 1).map((m) => `<tr><td>T${m.month}</td><td class="num">${fmtNum(m.customers)}</td><td class="num">${fmtMoney(m.revenue)}</td><td class="num" style="color:${m.ebitda >= 0 ? 'var(--ok,#4fc79a)' : 'var(--err,#e0685f)'}">${fmtMoney(m.ebitda)}</td><td class="num">${fmtMoney(m.cash)}</td><td class="num">${m.headcount}</td></tr>`).join('')}
+          </tbody></table></div>
+          ${d3.materialized_rows > 0 ? `<div style="margin-top:8px;color:var(--ok,#4fc79a);font-size:.8rem">✓ Đã ghi ${d3.materialized_rows} dòng vào hệ thống — giờ điều hành công ty giả lập này bằng đúng bộ dashboard/KPI/benchmark như công ty thật.</div>` : ''}`
+        toast('Giả lập xong')
+      })
+    }
+    const refreshMode = async () => { const r = await apiSend('/api/tenant-profile', 'GET'); if (r.ok) renderMode(r.data as ProfPayload) }
+    void refreshMode()
   },
 }
 
