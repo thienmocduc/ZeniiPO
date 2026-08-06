@@ -51,11 +51,11 @@ const PAGE_API_MAP: Record<string, string> = {
   'page-pitch': '/api/pitch',
   'page-terms': '/api/glossary',
   'page-burn': '/api/burn',
-  'page-unit': '/api/unit-metrics',
+  'page-unit': '/api/unit-economics',
   'page-forecast': '/api/forecast',
   'page-playbook': '/api/modules?category=playbook',
   'page-compliance': '/api/readiness',
-  'page-legal': '/api/modules?category=legal',
+  'page-legal': '/api/compliance',
   'page-board': '/api/board',
   'page-audit': '/api/audit',
   'page-training': '/api/academy/progress',
@@ -1023,14 +1023,99 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-unit': (raw) => {
     const root = document.getElementById('page-unit')
     if (!root) return
-    const d = (raw as { data?: { latest?: Record<string, { value: number; unit?: string }> } })?.data
-    const latest = d?.latest ?? {}
-    patchKpiCards(root, [
-      latest.cac ? { value: fmtMoney(latest.cac.value), label: 'CAC' } : null,
-      latest.ltv || latest.clv ? { value: fmtMoney((latest.ltv ?? latest.clv).value), label: 'LTV' } : null,
-      latest.payback_months ? { value: `${latest.payback_months.value}<em> mo</em>`, label: 'Payback' } : null,
-      latest.gross_margin ? { value: `${latest.gross_margin.value}<em>%</em>`, label: 'Gross margin' } : null,
-    ])
+    type Ue = { id: string; period: string; new_customers: number; churned_customers: number; active_customers: number; starting_mrr: number; new_mrr: number; expansion_mrr: number; contraction_mrr: number; churned_mrr: number }
+    const render = (list: Ue[]) => {
+      const cur = list[0]
+      const netMrr = cur ? cur.starting_mrr + cur.new_mrr + cur.expansion_mrr - cur.contraction_mrr - cur.churned_mrr : 0
+      patchKpiCards(root, [
+        { value: cur ? fmtNum(cur.active_customers) : '—', label: 'Khách đang hoạt động', sub: cur ? String(cur.period).slice(0, 7) : 'chưa có dữ liệu' },
+        { value: cur ? fmtMoney(netMrr) : '—', label: 'MRR cuối kỳ' },
+        { value: cur ? `+${cur.new_customers} / −${cur.churned_customers}` : '—', label: 'Khách mới / rời' },
+        { value: cur ? fmtMoney(cur.expansion_mrr) : '—', label: 'MRR mở rộng' },
+      ])
+      const rows = list.slice(0, 24).map((u) => {
+        const net = u.starting_mrr + u.new_mrr + u.expansion_mrr - u.contraction_mrr - u.churned_mrr
+        return `<tr><td><strong>${String(u.period).slice(0, 7)}</strong></td><td class="num">${fmtNum(u.active_customers)}</td><td class="num" style="color:var(--ok,#4fc79a)">+${u.new_customers}</td><td class="num" style="color:var(--err,#e0685f)">−${u.churned_customers}</td><td class="num">${fmtMoney(net)}</td></tr>`
+      })
+      patchTable(root, '.card', rows, 'Chưa có dữ liệu khách hàng. Bấm "+ Tháng khách" — CAC/LTV/NRR sẽ tự tính từ đây + P&L.', 5)
+    }
+    const refresh = async () => { const r = await apiSend('/api/unit-economics', 'GET'); if (r.ok) render((r.data as Ue[]) ?? []) }
+    render(((raw as { data?: Ue[] })?.data) ?? [])
+
+    let panel = root.querySelector<HTMLElement>('#ue-panel')
+    if (!panel) {
+      panel = document.createElement('div')
+      panel.id = 'ue-panel'
+      panel.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02));display:none'
+      const kpiRow = root.querySelector('.kpi-row')
+      if (kpiRow?.parentNode) kpiRow.parentNode.insertBefore(panel, kpiRow.nextSibling)
+      else root.appendChild(panel)
+    }
+    const box = panel
+
+    ensureHeaderButton(root, 'za-add-ue', '+ Tháng khách', async () => {
+      const now = new Date()
+      const defP = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const v = await openFormModal({
+        title: 'Nhập dữ liệu khách hàng + MRR tháng',
+        fields: [
+          { name: 'period', label: 'Tháng (YYYY-MM)', required: true, value: defP },
+          { name: 'active_customers', label: 'Khách đang hoạt động (cuối kỳ)', type: 'number', required: true },
+          { name: 'new_customers', label: 'Khách mới trong kỳ', type: 'number' },
+          { name: 'churned_customers', label: 'Khách rời bỏ trong kỳ', type: 'number' },
+          { name: 'starting_mrr', label: 'MRR đầu kỳ', type: 'number' },
+          { name: 'new_mrr', label: 'MRR từ khách mới', type: 'number' },
+          { name: 'expansion_mrr', label: 'MRR mở rộng (upsell)', type: 'number' },
+          { name: 'contraction_mrr', label: 'MRR giảm (downgrade)', type: 'number' },
+          { name: 'churned_mrr', label: 'MRR mất (churn)', type: 'number' },
+        ],
+        submitLabel: 'Lưu tháng',
+      })
+      if (!v) return
+      const res = await apiSend('/api/unit-economics', 'POST', {
+        period: v.period,
+        active_customers: num(v.active_customers) ?? 0, new_customers: num(v.new_customers) ?? 0,
+        churned_customers: num(v.churned_customers) ?? 0, starting_mrr: num(v.starting_mrr) ?? 0,
+        new_mrr: num(v.new_mrr) ?? 0, expansion_mrr: num(v.expansion_mrr) ?? 0,
+        contraction_mrr: num(v.contraction_mrr) ?? 0, churned_mrr: num(v.churned_mrr) ?? 0,
+      })
+      if (res.ok) { toast('Đã lưu'); void refresh() } else toast(res.error ?? 'Lỗi lưu', 'err')
+    })
+
+    ensureHeaderButton(root, 'za-ue-derive', '📊 Tính & chấm chuẩn IPO', async () => {
+      box.style.display = 'block'
+      box.innerHTML = `<div style="color:var(--dim);padding:8px">Đang tính CAC · LTV · NRR · Rule of 40 · Burn Multiple… rồi so chuẩn ngành…</div>`
+      const r = await apiSend('/api/unit-economics/derive', 'POST', {})
+      if (!r.ok) { box.innerHTML = `<div style="color:var(--err,#e0685f);padding:8px">${escapeHtml(r.error ?? 'Lỗi tính')}</div>`; return }
+      const d = r.data as {
+        metrics: Record<string, number | string | null>
+        benchmark: { stage: string; passed: number; measured: number; score_pct: number; items: Array<{ name: string; category: string; actual: number | null; status: string; target: string; note: string; fix_hint: string | null }> }
+      }
+      const m = d.metrics; const b = d.benchmark
+      const fmtV = (x: number | string | null, suffix = '') => (x == null ? '—' : `${typeof x === 'number' ? (Math.abs(x) >= 10000 ? fmtMoney(x) : x) : x}${suffix}`)
+      const cards = [
+        ['CAC', fmtV(m.cac as number)], ['LTV', fmtV(m.ltv as number)],
+        ['LTV:CAC', fmtV(m.ltv_cac_ratio as number, '×')], ['CAC Payback', fmtV(m.cac_payback_months as number, ' tháng')],
+        ['NRR', fmtV(m.nrr_pct as number, '%')], ['GRR', fmtV(m.grr_pct as number, '%')],
+        ['ARR', fmtV(m.arr as number)], ['Rule of 40', fmtV(m.rule_of_40 as number)],
+        ['Burn Multiple', fmtV(m.burn_multiple as number, '×')], ['Magic Number', fmtV(m.magic_number as number, '×')],
+        ['Quick Ratio', fmtV(m.quick_ratio as number, '×')], ['Logo churn', fmtV(m.logo_churn_pct as number, '%/th')],
+      ]
+      const statusIcon = (s: string) => (s === 'pass' ? '<span style="color:var(--ok,#4fc79a)">✓ ĐẠT</span>' : s === 'fail' ? '<span style="color:var(--err,#e0685f)">✕ CHƯA ĐẠT</span>' : '<span style="color:var(--dim)">— thiếu dữ liệu</span>')
+      const scoreColor = b.score_pct >= 80 ? 'var(--ok,#4fc79a)' : b.score_pct >= 50 ? 'var(--gold,#e4c16e)' : 'var(--err,#e0685f)'
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <strong>📊 Unit economics kỳ ${escapeHtml(String(m.period ?? ''))}</strong>
+          <span>Chuẩn giai đoạn <strong>${escapeHtml(b.stage)}</strong>: <strong style="color:${scoreColor}">${b.passed}/${b.measured} đạt (${b.score_pct}%)</strong></span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px">
+          ${cards.map(([l, v2]) => `<div style="padding:8px;border:1px solid var(--line,#2a2a3f);border-radius:8px"><div style="font-size:.62rem;color:var(--dim);text-transform:uppercase">${l}</div><strong>${v2}</strong></div>`).join('')}
+        </div>
+        <div style="overflow-x:auto"><table class="tbl" style="width:100%"><thead><tr><th>Chỉ số</th><th>Thực tế</th><th>Chuẩn</th><th>Kết quả</th><th>Việc cần làm</th></tr></thead><tbody>
+        ${b.items.map((it) => `<tr><td><strong>${escapeHtml(it.name)}</strong><br/><span style="font-size:.62rem;color:var(--dim)">${escapeHtml(it.note ?? '')}</span></td><td class="num">${it.actual ?? '—'}</td><td class="num">${escapeHtml(it.target ?? '')}</td><td>${statusIcon(it.status)}</td><td style="font-size:.76rem;color:var(--ink-2,#b3b2aa)">${escapeHtml(it.fix_hint ?? '')}</td></tr>`).join('')}
+        </tbody></table></div>`
+      toast(`Đã chấm: ${b.passed}/${b.measured} đạt chuẩn ${b.stage}`)
+    })
   },
 
   'page-forecast': (raw) => {
@@ -1075,16 +1160,62 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
     ])
   },
 
-  'page-legal': (raw) => {
+  'page-legal': () => {
     const root = document.getElementById('page-legal')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; title?: string }> })?.data) ?? []
-    patchKpiCards(root, [
-      { value: String(list.length), label: 'Legal docs' },
-      { value: '0', label: 'Active licenses' },
-      { value: '0', label: 'Expiring 30d' },
-      { value: '0', label: 'Open issues' },
-    ])
+    type Item = { id: string; item_type: string; title: string; authority?: string; reference_no?: string; expiry_date?: string; status: string }
+    const TYPE_VI: Record<string, string> = {
+      license: 'Giấy phép', contract: 'Hợp đồng', ip: 'Sở hữu trí tuệ', tax: 'Thuế',
+      labor: 'Lao động', filing: 'Hồ sơ nộp', insurance: 'Bảo hiểm', policy: 'Quy chế', other: 'Khác',
+    }
+    const daysLeft = (d?: string) => (d ? Math.round((new Date(d).getTime() - Date.now()) / 86_400_000) : null)
+    const render = (list: Item[]) => {
+      const expiring = list.filter((i) => { const dl = daysLeft(i.expiry_date); return dl != null && dl >= 0 && dl <= 60 })
+      const expired = list.filter((i) => { const dl = daysLeft(i.expiry_date); return dl != null && dl < 0 })
+      patchKpiCards(root, [
+        { value: String(list.length), label: 'Hồ sơ pháp lý' },
+        { value: String(list.filter((i) => i.item_type === 'license' && i.status === 'active').length), label: 'Giấy phép hiệu lực' },
+        { value: String(expiring.length), label: 'Sắp hết hạn 60 ngày', sub: expiring.length ? '⚠ cần gia hạn' : 'ổn' },
+        { value: String(expired.length), label: 'Đã hết hạn', sub: expired.length ? '🚨 rủi ro DD' : 'sạch' },
+      ])
+      const rows = list.slice(0, 50).map((i) => {
+        const dl = daysLeft(i.expiry_date)
+        const cls = dl == null ? 'dim' : dl < 0 ? 'err' : dl <= 60 ? 'warn' : 'ok'
+        const dlTxt = dl == null ? '—' : dl < 0 ? `hết hạn ${-dl} ngày` : `còn ${dl} ngày`
+        return `<tr><td><strong>${escapeHtml(i.title)}</strong>${i.reference_no ? `<br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(i.reference_no)}</span>` : ''}<button data-del="${i.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(TYPE_VI[i.item_type] ?? i.item_type)}</td><td>${escapeHtml(i.authority ?? '—')}</td><td>${i.expiry_date ? fmtDate(i.expiry_date) : '—'}</td><td><span class="st ${cls}">${dlTxt}</span></td></tr>`
+      })
+      patchTable(root, '.card', rows, 'Sổ pháp lý trống. Thêm giấy phép/hợp đồng/IP — DD pháp lý soi đúng bảng này.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá hồ sơ này?')) return
+        const r = await apiSend(`/api/compliance/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/compliance', 'GET'); if (r.ok) render((r.data as Item[]) ?? []) }
+    void refresh()
+    ensureHeaderButton(root, 'za-add-comp', '+ Hồ sơ pháp lý', async () => {
+      const v = await openFormModal({
+        title: 'Thêm hồ sơ tuân thủ',
+        fields: [
+          { name: 'title', label: 'Tên hồ sơ', required: true, placeholder: 'GPKD / Hợp đồng thuê / Nhãn hiệu…' },
+          { name: 'item_type', label: 'Loại', type: 'select', required: true, options: Object.entries(TYPE_VI).map(([v2, l]) => ({ value: v2, label: l })) },
+          { name: 'authority', label: 'Cơ quan cấp / đối tác' },
+          { name: 'reference_no', label: 'Số hiệu' },
+          { name: 'issued_date', label: 'Ngày cấp (YYYY-MM-DD)' },
+          { name: 'expiry_date', label: 'Ngày hết hạn (YYYY-MM-DD)' },
+          { name: 'notes', label: 'Ghi chú', type: 'textarea' },
+        ],
+        submitLabel: 'Thêm',
+      })
+      if (!v) return
+      const res = await apiSend('/api/compliance', 'POST', {
+        title: v.title, item_type: v.item_type, authority: v.authority || undefined,
+        reference_no: v.reference_no || undefined, issued_date: v.issued_date || undefined,
+        expiry_date: v.expiry_date || undefined, notes: v.notes || undefined,
+      })
+      if (res.ok) { toast('Đã thêm hồ sơ'); void refresh() } else toast(res.error ?? 'Lỗi thêm', 'err')
+    })
   },
 
   'page-board': (raw) => {
@@ -1111,10 +1242,59 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
         }
       }
     }
-    if (cards[1]) {
-      const tbody = cards[1].querySelector<HTMLTableSectionElement>('table.tbl tbody')
-      if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:18px;font-style:italic">Chưa có resolution. Tạo resolution đầu tiên qua "+ New resolution".</td></tr>`
+    // Card 1: Nghị quyết HĐQT — dữ liệu thật từ board_resolutions.
+    const TYPE_VI: Record<string, string> = {
+      funding: 'Gọi vốn', esop: 'ESOP', appointment: 'Bổ nhiệm', budget: 'Ngân sách',
+      m_and_a: 'M&A', policy: 'Quy chế', audit: 'Kiểm toán', ipo: 'IPO', other: 'Khác',
     }
+    type Res = { id: string; resolution_no?: string; title: string; meeting_date: string; resolution_type: string; status: string; votes_for?: number; votes_against?: number }
+    const renderRes = (list: Res[]) => {
+      const tbody = cards[1]?.querySelector<HTMLTableSectionElement>('table.tbl tbody')
+      if (!tbody) return
+      const kpiSub = root.querySelectorAll<HTMLElement>('.kpi-row .kpi-card .kpi-v')
+      if (kpiSub[2]) kpiSub[2].textContent = String(list.length)
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:18px;font-style:italic">Chưa có nghị quyết. Mọi quyết định lớn cần nghị quyết ký — thiếu là mất điểm governance khi DD/IPO.</td></tr>`
+        return
+      }
+      tbody.innerHTML = list.slice(0, 30).map((r) => {
+        const cls = r.status === 'approved' || r.status === 'executed' ? 'ok' : r.status === 'rejected' ? 'err' : 'warn'
+        return `<tr><td><strong>${escapeHtml(r.title)}</strong>${r.resolution_no ? `<br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(r.resolution_no)}</span>` : ''}<button data-delres="${r.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(TYPE_VI[r.resolution_type] ?? r.resolution_type)}</td><td>${fmtDate(r.meeting_date)}</td><td><span class="st ${cls}">${escapeHtml(r.status)}</span>${(r.votes_for ?? 0) + (r.votes_against ?? 0) > 0 ? `<br/><span style="font-size:.6rem;color:var(--dim)">${r.votes_for ?? 0} thuận / ${r.votes_against ?? 0} chống</span>` : ''}</td></tr>`
+      }).join('')
+      wireEach(root, 'button[data-delres]', async (el) => {
+        const id = el.getAttribute('data-delres')
+        if (!id || !window.confirm('Xoá nghị quyết này?')) return
+        const r = await apiSend(`/api/board/resolutions/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refreshRes() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refreshRes = async () => { const r = await apiSend('/api/board/resolutions', 'GET'); if (r.ok) renderRes((r.data as Res[]) ?? []) }
+    void refreshRes()
+    ensureHeaderButton(root, 'za-add-res', '+ Nghị quyết', async () => {
+      const today = new Date().toISOString().slice(0, 10)
+      const v = await openFormModal({
+        title: 'Tạo nghị quyết HĐQT',
+        fields: [
+          { name: 'title', label: 'Tiêu đề nghị quyết', required: true },
+          { name: 'resolution_no', label: 'Số hiệu', placeholder: 'NQ-01/2026/HĐQT' },
+          { name: 'resolution_type', label: 'Loại', type: 'select', options: Object.entries(TYPE_VI).map(([v2, l]) => ({ value: v2, label: l })) },
+          { name: 'meeting_date', label: 'Ngày họp (YYYY-MM-DD)', value: today },
+          { name: 'status', label: 'Trạng thái', type: 'select', options: [['draft', 'Nháp'], ['voted', 'Đã biểu quyết'], ['approved', 'Thông qua'], ['rejected', 'Bác bỏ'], ['executed', 'Đã thực thi']].map(([v2, l]) => ({ value: v2, label: l })) },
+          { name: 'votes_for', label: 'Phiếu thuận', type: 'number' },
+          { name: 'votes_against', label: 'Phiếu chống', type: 'number' },
+          { name: 'body', label: 'Nội dung', type: 'textarea' },
+        ],
+        submitLabel: 'Tạo nghị quyết',
+      })
+      if (!v) return
+      const res = await apiSend('/api/board/resolutions', 'POST', {
+        title: v.title, resolution_no: v.resolution_no || undefined,
+        resolution_type: v.resolution_type || 'other', meeting_date: v.meeting_date || undefined,
+        status: v.status || 'draft', votes_for: num(v.votes_for), votes_against: num(v.votes_against),
+        body: v.body || undefined,
+      })
+      if (res.ok) { toast('Đã tạo nghị quyết'); void refreshRes() } else toast(res.error ?? 'Lỗi tạo', 'err')
+    })
   },
 
   'page-audit': (raw) => {
@@ -1163,11 +1343,107 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
     const d = (raw as { data?: { journey?: { valuation_target?: number; current_phase?: number; target_year?: number }; cap_history?: unknown[]; comparables?: unknown[] } })?.data
     const j = d?.journey
     patchKpiCards(root, [
-      typeof j?.valuation_target === 'number' ? { value: fmtMoney(j.valuation_target), label: 'Target valuation' } : { value: '—' },
-      j?.current_phase ? { value: `Phase ${j.current_phase}`, label: 'Phase' } : { value: '—' },
+      typeof j?.valuation_target === 'number' ? { value: fmtMoney(j.valuation_target), label: 'Định giá mục tiêu' } : { value: '—', label: 'Định giá mục tiêu' },
+      j?.current_phase ? { value: `Phase ${j.current_phase}`, label: 'Giai đoạn' } : { value: '—', label: 'Giai đoạn' },
       { value: String(d?.cap_history?.length ?? 0), label: 'Cap snapshots' },
-      { value: String(d?.comparables?.length ?? 0), label: 'Comparables' },
+      { value: String(d?.comparables?.length ?? 0), label: 'Peer companies' },
     ])
+
+    let panel = root.querySelector<HTMLElement>('#val-panel')
+    if (!panel) {
+      panel = document.createElement('div')
+      panel.id = 'val-panel'
+      panel.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02));display:none'
+      const kpiRow = root.querySelector('.kpi-row')
+      if (kpiRow?.parentNode) kpiRow.parentNode.insertBefore(panel, kpiRow.nextSibling)
+      else root.appendChild(panel)
+    }
+    const box = panel
+    const show = (html: string) => { box.style.display = 'block'; box.innerHTML = html }
+    const money = (x: unknown) => (typeof x === 'number' ? fmtMoney(x) : '—')
+
+    const runVal = async (payload: Record<string, unknown>, title: string) => {
+      show(`<div style="color:var(--dim);padding:8px">Đang định giá theo ${escapeHtml(title)}…</div>`)
+      const r = await apiSend('/api/valuation/run', 'POST', payload)
+      if (!r.ok) { show(`<div style="color:var(--err,#e0685f);padding:8px">${escapeHtml(r.error ?? 'Lỗi định giá')}</div>`); return }
+      const v = r.data as Record<string, unknown>
+      const ttm = v.ttm as { revenue?: number; ebitda?: number } | undefined
+      let detail = ''
+      if (v.method === 'comparables') {
+        const mu = v.multiples_used as { ev_revenue?: number | null; ev_ebitda?: number | null; pe?: number | null }
+        detail = `<div style="font-size:.8rem;color:var(--ink-2,#b3b2aa);margin-top:8px">Bội số trung vị từ ${String(v.peer_count)} peer — EV/Rev <strong>${mu?.ev_revenue ?? '—'}×</strong> · EV/EBITDA <strong>${mu?.ev_ebitda ?? '—'}×</strong> · P/E <strong>${mu?.pe ?? '—'}</strong><br/>Đã trừ chiết khấu thanh khoản công ty tư nhân ${String(v.illiquidity_discount_pct)}%.</div>`
+      } else if (v.method === 'dcf') {
+        const a = v.assumptions as Record<string, number>
+        detail = `<div style="font-size:.8rem;color:var(--ink-2,#b3b2aa);margin-top:8px">WACC ${a.wacc_pct}% · tăng trưởng ${a.growth_rate_pct}%/năm · ${a.years} năm · g vĩnh viễn ${a.terminal_growth_pct}%<br/>PV giai đoạn dự báo ${money(v.pv_explicit)} + PV giá trị cuối ${money(v.pv_terminal)} (<strong>${String(v.terminal_pct_of_ev)}%</strong> giá trị nằm ở terminal — càng cao càng rủi ro giả định).</div>`
+      } else {
+        detail = `<div style="font-size:.8rem;color:var(--ink-2,#b3b2aa);margin-top:8px">Giá trị thoái vốn ${money(v.exit_value)} → chiết khấu về hôm nay.<br/>Nhà đầu tư cần <strong>${String(v.ownership_required_pct)}%</strong> (sau pha loãng dự kiến: <strong>${String(v.ownership_adjusted_for_dilution_pct)}%</strong>).</div>`
+      }
+      show(`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <strong>💰 Kết quả định giá — ${escapeHtml(title)}</strong>
+          ${ttm?.revenue ? `<span style="font-size:.75rem;color:var(--dim)">TTM doanh thu ${money(ttm.revenue)} · EBITDA ${money(ttm.ebitda)}</span>` : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px">
+          <div style="padding:10px;border:1px solid var(--gold,#e4c16e);border-radius:8px"><div style="font-size:.65rem;color:var(--dim);text-transform:uppercase">Enterprise Value</div><strong style="font-size:1.1rem">${money(v.enterprise_value)}</strong></div>
+          <div style="padding:10px;border:1px solid var(--line,#2a2a3f);border-radius:8px"><div style="font-size:.65rem;color:var(--dim);text-transform:uppercase">Equity Value</div><strong style="font-size:1.1rem">${money(v.equity_value)}</strong></div>
+        </div>${detail}
+        <div style="font-size:.7rem;color:var(--dim);margin-top:10px">Đã lưu vào lịch sử định giá (audit trail cho due-diligence).</div>`)
+      toast('Định giá xong')
+    }
+
+    ensureHeaderButton(root, 'za-val-comp', '📈 Định giá theo Comparables', async () => {
+      const v = await openFormModal({
+        title: 'Định giá theo bội số thị trường (Comparables)',
+        fields: [
+          { name: 'net_debt', label: 'Nợ ròng (nợ − tiền), để 0 nếu không có', type: 'number', value: '0' },
+          { name: 'illiquidity_discount_pct', label: 'Chiết khấu thanh khoản %', type: 'number', value: '25' },
+        ],
+        submitLabel: 'Định giá',
+      })
+      if (!v) return
+      await runVal({ method: 'comparables', net_debt: num(v.net_debt) ?? 0, illiquidity_discount_pct: num(v.illiquidity_discount_pct) ?? 25 }, 'Comparables (bội số peer)')
+    })
+
+    ensureHeaderButton(root, 'za-val-dcf', '🧮 Định giá DCF', async () => {
+      const v = await openFormModal({
+        title: 'Chiết khấu dòng tiền (DCF)',
+        fields: [
+          { name: 'fcf_year1', label: 'FCF năm 1 (bỏ trống = tự ước từ P&L)', type: 'number' },
+          { name: 'growth_rate_pct', label: 'Tăng trưởng FCF %/năm', type: 'number', value: '20', required: true },
+          { name: 'years', label: 'Số năm dự báo', type: 'number', value: '5', required: true },
+          { name: 'wacc_pct', label: 'WACC % (chi phí vốn bình quân)', type: 'number', value: '18', required: true },
+          { name: 'terminal_growth_pct', label: 'Tăng trưởng vĩnh viễn %', type: 'number', value: '3', required: true },
+          { name: 'net_debt', label: 'Nợ ròng', type: 'number', value: '0' },
+        ],
+        submitLabel: 'Chạy DCF',
+      })
+      if (!v) return
+      await runVal({
+        method: 'dcf', fcf_year1: num(v.fcf_year1), growth_rate_pct: num(v.growth_rate_pct) ?? 20,
+        years: num(v.years) ?? 5, wacc_pct: num(v.wacc_pct) ?? 18,
+        terminal_growth_pct: num(v.terminal_growth_pct) ?? 3, net_debt: num(v.net_debt) ?? 0,
+      }, 'DCF (chiết khấu dòng tiền)')
+    })
+
+    ensureHeaderButton(root, 'za-val-vc', '🦄 VC Method', async () => {
+      const v = await openFormModal({
+        title: 'VC Method — định giá theo kỳ vọng thoái vốn',
+        fields: [
+          { name: 'exit_revenue', label: 'Doanh thu năm thoái vốn', type: 'number', required: true },
+          { name: 'exit_multiple', label: 'Bội số khi thoái (EV/Rev)', type: 'number', value: '5', required: true },
+          { name: 'years_to_exit', label: 'Số năm tới khi thoái', type: 'number', value: '5', required: true },
+          { name: 'target_irr_pct', label: 'IRR mục tiêu của quỹ %', type: 'number', value: '40', required: true },
+          { name: 'investment_usd', label: 'Số tiền đầu tư vòng này', type: 'number', required: true },
+          { name: 'future_dilution_pct', label: 'Pha loãng vòng sau %', type: 'number', value: '25' },
+        ],
+        submitLabel: 'Tính',
+      })
+      if (!v) return
+      await runVal({
+        method: 'vc_method', exit_revenue: num(v.exit_revenue) ?? 0, exit_multiple: num(v.exit_multiple) ?? 5,
+        years_to_exit: num(v.years_to_exit) ?? 5, target_irr_pct: num(v.target_irr_pct) ?? 40,
+        investment_usd: num(v.investment_usd) ?? 0, future_dilution_pct: num(v.future_dilution_pct) ?? 25,
+      }, 'VC Method')
+    })
   },
 
   'page-token': (raw) => {
