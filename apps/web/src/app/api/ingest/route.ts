@@ -47,7 +47,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const sb = createServiceClient()
+  // Cổng này chạy KHÔNG có phiên người dùng (hệ thống ngoài gọi vào) nên phải
+  // dùng service client. Thiếu cấu hình thì báo 503 rõ ràng cho bên gọi biết
+  // là lỗi phía Zeni, thay vì ném 500 khó đoán.
+  let sb
+  try {
+    sb = createServiceClient()
+  } catch {
+    return NextResponse.json(
+      { error: 'Cổng nạp dữ liệu chưa sẵn sàng — thiếu cấu hình phía Zeni (SUPABASE_SERVICE_ROLE_KEY).' },
+      { status: 503 },
+    )
+  }
 
   const { data: connector } = await sb
     .from('data_connectors')
