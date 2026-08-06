@@ -39,14 +39,14 @@ const PAGE_API_MAP: Record<string, string> = {
   'page-roadmap': '/api/roadmap',
   'page-agents': '/api/agents',
   // Chunk 3 — 35 additional pages
-  'page-northstar': '/api/dashboard',
+  'page-northstar': '/api/masterplan',
   'page-kpi': '/api/kpis',
   'page-schema': '/api/workflow',
   'page-dataroom': '/api/vault',
   'page-council': '/api/council',
   'page-datafow': '/api/dataflow',
   'page-team': '/api/team',
-  'page-sops': '/api/modules?category=sops',
+  'page-sops': '/api/sops',
   'page-investors': '/api/investors',
   'page-pitch': '/api/pitch',
   'page-terms': '/api/glossary',
@@ -696,25 +696,110 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-northstar': (raw) => {
     const root = document.getElementById('page-northstar')
     if (!root) return
-    const d = (raw as { data?: { journey?: { north_star_metric?: string; current_phase?: number; valuation_target?: number; target_year?: number }, kpis?: Array<{ name: string; value: number }> } })?.data
-    const j = d?.journey
-    const kpis = d?.kpis ?? []
-    if (j) {
+    type Yr = { id: string; year: number; phase?: number; revenue_target?: number; gross_margin_target_pct?: number; ebitda_target?: number; headcount_target?: number; funding_target?: number; funding_round_code?: string; valuation_target?: number; key_milestone?: string }
+    type Mp = { years?: Yr[]; journey?: { current_phase?: number; target_year?: number; valuation_target?: number; north_star_metric?: string } | null }
+    const thisYear = new Date().getFullYear()
+    const render = (d: Mp) => {
+      const years = d.years ?? []
+      const j = d.journey
+      const cur = years.find((y) => y.year === thisYear)
+      const last = years[years.length - 1]
       patchKpiCards(root, [
-        j.north_star_metric ? { value: escapeHtml(j.north_star_metric.slice(0, 12)) } : null,
-        typeof j.valuation_target === 'number' ? { value: fmtMoney(j.valuation_target) } : null,
-        j.current_phase ? { value: `Phase ${j.current_phase}` } : null,
-        j.target_year ? { value: String(j.target_year) } : null,
+        { value: j?.north_star_metric ? escapeHtml(j.north_star_metric.slice(0, 14)) : '—', label: 'North Star metric' },
+        { value: cur?.revenue_target != null ? fmtMoney(cur.revenue_target) : '—', label: `Doanh thu KH ${thisYear}` },
+        { value: years.length ? `${years[0].year}–${last.year}` : '—', label: 'Tầm kế hoạch', sub: `${years.length} năm` },
+        { value: last?.valuation_target != null ? fmtMoney(last.valuation_target) : (j?.valuation_target != null ? fmtMoney(j.valuation_target) : '—'), label: 'Định giá đích' },
       ])
+      const rows = years.map((y) => {
+        const isCur = y.year === thisYear
+        return `<tr${isCur ? ' style="background:rgba(228,193,110,.06)"' : ''}><td><strong>${y.year}</strong>${y.phase ? `<br/><span style="font-size:.6rem;color:var(--dim)">bước ${y.phase}/10</span>` : ''}<button data-del="${y.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td class="num">${y.revenue_target != null ? fmtMoney(y.revenue_target) : '—'}</td><td class="num">${y.gross_margin_target_pct != null ? `${y.gross_margin_target_pct}%` : '—'}</td><td class="num">${y.headcount_target ?? '—'}</td><td>${y.funding_target != null ? `${fmtMoney(y.funding_target)}${y.funding_round_code ? ` <span style="font-size:.6rem;color:var(--dim)">${escapeHtml(y.funding_round_code)}</span>` : ''}` : '—'}<br/><span style="font-size:.68rem;color:var(--ink-2,#b3b2aa)">${escapeHtml(y.key_milestone ?? '')}</span></td></tr>`
+      })
+      patchTable(root, '.card', rows, 'Chưa có masterplan. Bấm "+ Năm kế hoạch" — lập bản đồ tài chính từ nay tới IPO (doanh thu · biên · nhân sự · vốn · cột mốc).', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá năm kế hoạch này?')) return
+        const r = await apiSend(`/api/masterplan/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
     }
-    const tbody = root.querySelector<HTMLTableSectionElement>('table.tbl tbody')
-    if (tbody) {
-      if (kpis.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:18px;font-style:italic">North Star metric chưa có KPI gắn. Vào /kpi-matrix tạo KPI đầu tiên.</td></tr>`
-      } else {
-        tbody.innerHTML = kpis.slice(0, 8).map((k) => `<tr><td><strong>${escapeHtml(k.name)}</strong></td><td class="num">${fmtNum(k.value)}</td><td>—</td><td><span class="st ok">live</span></td></tr>`).join('')
+    const refresh = async () => { const r = await apiSend('/api/masterplan', 'GET'); if (r.ok) render(r.data as Mp) }
+    render(((raw as { data?: Mp })?.data) ?? {})
+
+    let panel = root.querySelector<HTMLElement>('#mp-review')
+    if (!panel) {
+      panel = document.createElement('div')
+      panel.id = 'mp-review'
+      panel.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02));display:none'
+      const kpiRow = root.querySelector('.kpi-row')
+      if (kpiRow?.parentNode) kpiRow.parentNode.insertBefore(panel, kpiRow.nextSibling)
+      else root.appendChild(panel)
+    }
+    const box = panel
+
+    ensureHeaderButton(root, 'za-add-year', '+ Năm kế hoạch', async () => {
+      const v = await openFormModal({
+        title: 'Lập kế hoạch một năm (masterplan)',
+        fields: [
+          { name: 'year', label: 'Năm', type: 'number', required: true, value: String(thisYear) },
+          { name: 'phase', label: 'Bước hành trình (1-10)', type: 'number' },
+          { name: 'revenue_target', label: 'Doanh thu mục tiêu', type: 'number' },
+          { name: 'gross_margin_target_pct', label: 'Biên gộp mục tiêu %', type: 'number' },
+          { name: 'ebitda_target', label: 'EBITDA mục tiêu', type: 'number' },
+          { name: 'headcount_target', label: 'Nhân sự mục tiêu (người)', type: 'number' },
+          { name: 'funding_target', label: 'Vốn cần gọi', type: 'number' },
+          { name: 'funding_round_code', label: 'Vòng gọi vốn', placeholder: 'seed / series_a / pre_ipo' },
+          { name: 'valuation_target', label: 'Định giá mục tiêu', type: 'number' },
+          { name: 'key_milestone', label: 'Cột mốc then chốt của năm' },
+        ],
+        submitLabel: 'Lưu năm',
+      })
+      if (!v) return
+      const res = await apiSend('/api/masterplan', 'POST', {
+        year: num(v.year) ?? thisYear, phase: num(v.phase),
+        revenue_target: num(v.revenue_target), gross_margin_target_pct: num(v.gross_margin_target_pct),
+        ebitda_target: num(v.ebitda_target), headcount_target: num(v.headcount_target),
+        funding_target: num(v.funding_target), funding_round_code: v.funding_round_code || undefined,
+        valuation_target: num(v.valuation_target), key_milestone: v.key_milestone || undefined,
+      })
+      if (res.ok) { toast('Đã lưu năm kế hoạch'); void refresh() } else toast(res.error ?? 'Lỗi lưu', 'err')
+    })
+
+    ensureHeaderButton(root, 'za-mp-review', '🎯 Kế hoạch vs Thực tế', async () => {
+      box.style.display = 'block'
+      box.innerHTML = `<div style="color:var(--dim);padding:8px">Đang đối chiếu masterplan với P&L, nhân sự và vốn đã gọi…</div>`
+      const r = await apiSend('/api/masterplan/review', 'POST', { year: thisYear })
+      if (!r.ok) { box.innerHTML = `<div style="color:var(--err,#e0685f);padding:8px">${escapeHtml(r.error ?? 'Lỗi đối chiếu')}</div>`; return }
+      const d = r.data as {
+        year: number; phase?: number; revenue_pace_pct?: number
+        plan: Record<string, number | string | null>; actual: Record<string, number | string | null>
+        gaps: Array<{ metric: string; severity: string; message: string }>
       }
-    }
+      const row = (label: string, plan: unknown, actual: unknown, isMoney = true) => {
+        const p = typeof plan === 'number' ? (isMoney ? fmtMoney(plan) : fmtNum(plan)) : '—'
+        const a = typeof actual === 'number' ? (isMoney ? fmtMoney(actual) : fmtNum(actual)) : '—'
+        const pct = typeof plan === 'number' && plan > 0 && typeof actual === 'number' ? Math.round((actual / plan) * 100) : null
+        const col = pct == null ? 'var(--dim)' : pct >= 90 ? 'var(--ok,#4fc79a)' : pct >= 70 ? 'var(--gold,#e4c16e)' : 'var(--err,#e0685f)'
+        return `<tr><td><strong>${label}</strong></td><td class="num">${p}</td><td class="num">${a}</td><td class="num" style="color:${col}">${pct != null ? `${pct}%` : '—'}</td></tr>`
+      }
+      const sevCol = (s: string) => (s === 'critical' ? 'var(--err,#e0685f)' : s === 'warn' ? 'var(--gold,#e4c16e)' : 'var(--dim)')
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <strong>🎯 Kế hoạch vs Thực tế — năm ${d.year}${d.phase ? ` · bước ${d.phase}/10` : ''}</strong>
+          ${d.revenue_pace_pct != null ? `<span>Nhịp doanh thu: <strong style="color:${d.revenue_pace_pct >= 90 ? 'var(--ok,#4fc79a)' : d.revenue_pace_pct >= 70 ? 'var(--gold,#e4c16e)' : 'var(--err,#e0685f)'}">${d.revenue_pace_pct}%</strong> so tiến độ</span>` : ''}
+        </div>
+        <div style="overflow-x:auto"><table class="tbl" style="width:100%"><thead><tr><th>Chỉ tiêu</th><th>Kế hoạch</th><th>Thực tế</th><th>Đạt</th></tr></thead><tbody>
+          ${row('Doanh thu', d.plan.revenue, d.actual.revenue)}
+          ${row('Biên gộp %', d.plan.gross_margin_pct, d.actual.gross_margin_pct, false)}
+          ${row('EBITDA', d.plan.ebitda, d.actual.ebitda)}
+          ${row('Nhân sự', d.plan.headcount, d.actual.headcount, false)}
+          ${row('Vốn gọi', d.plan.funding, d.actual.funding)}
+        </tbody></table></div>
+        ${d.plan.milestone ? `<div style="margin-top:8px;font-size:.8rem"><strong>Cột mốc năm:</strong> ${escapeHtml(String(d.plan.milestone))}</div>` : ''}
+        ${d.gaps.length
+          ? `<div style="margin-top:10px"><strong style="font-size:.85rem">⚠ Khoảng lệch cần xử lý:</strong>${d.gaps.map((g) => `<div style="margin-top:6px;padding:8px;border-left:3px solid ${sevCol(g.severity)};background:rgba(255,255,255,.02);font-size:.82rem">${escapeHtml(g.message)}</div>`).join('')}</div>`
+          : `<div style="margin-top:10px;color:var(--ok,#4fc79a);font-size:.85rem">✓ Đang bám kế hoạch — không có lệch đáng kể.</div>`}`
+      toast('Đã đối chiếu kế hoạch')
+    })
   },
 
   'page-kpi': (raw) => {
@@ -928,18 +1013,212 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
         }
       }
     }
+
+    // ── SƠ ĐỒ TỔ CHỨC + KHUNG NĂNG LỰC TỪNG GHẾ ──
+    type Cap = { name: string; category: string; level: string }
+    type Pos = { id: string; title_vi: string; unit_code: string; level: string; status: string; holder_name?: string; capabilities?: Cap[]; decision_rights?: string[]; owns_metrics?: string[]; template_code?: string }
+    type Tpl = { template_code: string; title_vi: string; unit_code: string; level: string; mission_vi: string; capabilities?: Cap[]; decision_rights?: string[]; owns_metrics?: string[]; min_phase?: number }
+    type Unit = { unit_code: string; name_vi: string; mission_vi: string }
+    type OrgData = { units?: Unit[]; templates?: Tpl[]; positions?: Pos[]; current_phase?: number; missing_positions?: Tpl[]; summary?: { total: number; filled: number; open: number; coverage_pct: number } }
+    const LEVEL_VI: Record<string, string> = { c_level: 'C-level', director: 'Giám đốc', manager: 'Trưởng phòng', lead: 'Trưởng nhóm', ic: 'Chuyên viên' }
+
+    let org = root.querySelector<HTMLElement>('#org-panel')
+    if (!org) {
+      org = document.createElement('div')
+      org.id = 'org-panel'
+      org.style.cssText = 'margin:14px 0;padding:14px;border:1px solid var(--line,#2a2a3f);border-radius:12px;background:var(--panel,rgba(255,255,255,.02))'
+      root.appendChild(org)
+    }
+    const orgBox = org
+
+    const showCapabilities = async (title: string, caps: Cap[], rights: string[], metrics: string[], mission?: string) => {
+      const capHtml = caps.length
+        ? caps.map((c) => `<div style="margin-top:5px;font-size:.8rem">• <strong>${escapeHtml(c.name)}</strong> <span style="font-size:.65rem;color:var(--dim)">[${escapeHtml(c.category)} · ${escapeHtml(c.level)}]</span></div>`).join('')
+        : '<div style="color:var(--dim);font-style:italic">Chưa định nghĩa năng lực</div>'
+      await openFormModal({
+        title: `Khung năng lực — ${title}`,
+        fields: [{
+          name: 'info', label: 'Chi tiết vị trí', type: 'textarea',
+          value: [
+            mission ? `SỨ MỆNH:\n${mission}\n` : '',
+            `NĂNG LỰC BẮT BUỘC:\n${caps.map((c, i) => `${i + 1}. ${c.name} (${c.category} · ${c.level})`).join('\n') || '—'}\n`,
+            `QUYỀN QUYẾT ĐỊNH:\n${rights.map((r, i) => `${i + 1}. ${r}`).join('\n') || '—'}\n`,
+            `KPI CHỊU TRÁCH NHIỆM:\n${metrics.join(' · ') || '—'}`,
+          ].join('\n'),
+        }],
+        submitLabel: 'Đóng',
+      })
+      void capHtml
+    }
+
+    const renderOrg = (d: OrgData) => {
+      const units = d.units ?? []
+      const positions = d.positions ?? []
+      const missing = d.missing_positions ?? []
+      const s = d.summary
+      const unitName = (c: string) => units.find((u) => u.unit_code === c)?.name_vi ?? c
+
+      const posByUnit = new Map<string, Pos[]>()
+      for (const p of positions) {
+        const arr = posByUnit.get(p.unit_code) ?? []
+        arr.push(p)
+        posByUnit.set(p.unit_code, arr)
+      }
+
+      orgBox.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <strong>🏛 Sơ đồ tổ chức &amp; khung năng lực từng vị trí</strong>
+          <span style="font-size:.75rem;color:var(--dim)">${s?.filled ?? 0}/${s?.total ?? 0} ghế có người (${s?.coverage_pct ?? 0}%) · bước ${d.current_phase ?? 1}/10</span>
+        </div>
+        ${positions.length === 0
+          ? `<div style="color:var(--dim);font-style:italic;padding:6px 0 12px">Chưa lập sơ đồ tổ chức. Bấm "+ Vị trí" — chọn ghế chuẩn để kế thừa sẵn khung năng lực + quyền quyết định + KPI.</div>`
+          : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px">
+              ${[...posByUnit.entries()].map(([uc, ps]) => `<div style="border:1px solid var(--line,#2a2a3f);border-radius:10px;padding:10px">
+                <div style="font-size:.72rem;font-weight:700;color:var(--gold,#e4c16e);text-transform:uppercase;letter-spacing:.05em">${escapeHtml(unitName(uc))}</div>
+                ${ps.map((p) => `<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--line,#2a2a3f)">
+                  <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
+                    <span><strong style="font-size:.85rem">${escapeHtml(p.title_vi)}</strong> <span style="font-size:.6rem;color:var(--dim)">${escapeHtml(LEVEL_VI[p.level] ?? p.level)}</span></span>
+                    <span class="st ${p.status === 'filled' ? 'ok' : p.status === 'open' ? 'warn' : 'dim'}" style="font-size:.6rem">${p.status === 'filled' ? 'có người' : p.status === 'open' ? 'đang trống' : p.status}</span>
+                  </div>
+                  <div style="font-size:.7rem;color:var(--ink-2,#b3b2aa);margin-top:2px">${escapeHtml(p.holder_name ?? '— chưa bổ nhiệm')}</div>
+                  <div style="margin-top:4px;display:flex;gap:8px">
+                    <button data-cap="${p.id}" style="background:none;border:0;color:var(--gold,#e4c16e);cursor:pointer;font-size:.68rem;padding:0">📋 Năng lực (${(p.capabilities ?? []).length})</button>
+                    <button data-delpos="${p.id}" style="background:none;border:0;color:var(--dim);cursor:pointer;font-size:.68rem;padding:0">✕ Xoá</button>
+                  </div>
+                </div>`).join('')}
+              </div>`).join('')}
+            </div>`}
+        ${missing.length ? `<div style="margin-top:12px;padding:10px;border-left:3px solid var(--gold,#e4c16e);background:rgba(255,255,255,.02)">
+          <strong style="font-size:.8rem">⚠ Ghế CẦN CÓ ở bước ${d.current_phase ?? 1} mà chưa lập (${missing.length}):</strong>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            ${missing.map((t) => `<button data-add-tpl="${escapeHtml(t.template_code)}" style="background:rgba(228,193,110,.12);border:1px solid var(--gold,#e4c16e);color:var(--gold,#e4c16e);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:.72rem">+ ${escapeHtml(t.title_vi)}</button>`).join('')}
+          </div></div>` : ''}`
+
+      wireEach(orgBox, 'button[data-cap]', async (el) => {
+        const p = positions.find((x) => x.id === el.getAttribute('data-cap'))
+        if (!p) return
+        await showCapabilities(p.title_vi, p.capabilities ?? [], p.decision_rights ?? [], p.owns_metrics ?? [])
+      })
+      wireEach(orgBox, 'button[data-delpos]', async (el) => {
+        const id = el.getAttribute('data-delpos')
+        if (!id || !window.confirm('Xoá vị trí này khỏi sơ đồ tổ chức?')) return
+        const r = await apiSend(`/api/org/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refreshOrg() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+      wireEach(orgBox, 'button[data-add-tpl]', async (el) => {
+        const code = el.getAttribute('data-add-tpl')
+        const tpl = (d.templates ?? []).find((t) => t.template_code === code)
+        if (!tpl) return
+        const v = await openFormModal({
+          title: `Lập ghế: ${tpl.title_vi}`,
+          fields: [
+            { name: 'holder_name', label: 'Ai ngồi ghế này (bỏ trống nếu đang tuyển)' },
+            { name: 'status', label: 'Trạng thái', type: 'select', options: [['open', 'Đang trống — cần tuyển'], ['filled', 'Đã có người'], ['planned', 'Kế hoạch sau']].map(([v2, l]) => ({ value: v2, label: l })) },
+          ],
+          submitLabel: 'Lập ghế',
+        })
+        if (!v) return
+        const res = await apiSend('/api/org', 'POST', {
+          template_code: tpl.template_code, unit_code: tpl.unit_code, title_vi: tpl.title_vi,
+          level: tpl.level, holder_name: v.holder_name || undefined,
+          status: v.status || (v.holder_name ? 'filled' : 'open'),
+        })
+        if (res.ok) { toast(`Đã lập ghế ${tpl.title_vi} (kèm khung năng lực chuẩn)`); void refreshOrg() } else toast(res.error ?? 'Lỗi', 'err')
+      })
+    }
+    const refreshOrg = async () => { const r = await apiSend('/api/org', 'GET'); if (r.ok) renderOrg(r.data as OrgData) }
+    void refreshOrg()
+
+    ensureHeaderButton(root, 'za-add-pos', '+ Vị trí', async () => {
+      const r0 = await apiSend('/api/org', 'GET')
+      const d0 = (r0.ok ? (r0.data as OrgData) : {}) ?? {}
+      const tpls = d0.templates ?? []
+      const v = await openFormModal({
+        title: 'Thêm vị trí vào sơ đồ tổ chức',
+        fields: [
+          { name: 'template_code', label: 'Ghế chuẩn (kế thừa năng lực + quyền + KPI)', type: 'select', options: [{ value: '', label: '— Tự định nghĩa —' }, ...tpls.map((t) => ({ value: t.template_code, label: `${t.title_vi} (${t.unit_code})` }))] },
+          { name: 'title_vi', label: 'Tên vị trí (nếu tự định nghĩa)' },
+          { name: 'unit_code', label: 'Phòng ban (nếu tự định nghĩa)', type: 'select', options: (d0.units ?? []).map((u) => ({ value: u.unit_code, label: u.name_vi })) },
+          { name: 'level', label: 'Cấp', type: 'select', options: Object.entries(LEVEL_VI).map(([v2, l]) => ({ value: v2, label: l })) },
+          { name: 'holder_name', label: 'Ai ngồi ghế này' },
+        ],
+        submitLabel: 'Thêm vị trí',
+      })
+      if (!v) return
+      const tpl = tpls.find((t) => t.template_code === v.template_code)
+      const payload = {
+        template_code: v.template_code || undefined,
+        unit_code: tpl?.unit_code ?? v.unit_code,
+        title_vi: tpl?.title_vi ?? v.title_vi,
+        level: tpl?.level ?? v.level ?? 'manager',
+        holder_name: v.holder_name || undefined,
+        status: v.holder_name ? 'filled' : 'open',
+      }
+      if (!payload.unit_code || !payload.title_vi) { toast('Cần chọn ghế chuẩn hoặc nhập tên + phòng ban', 'err'); return }
+      const res = await apiSend('/api/org', 'POST', payload)
+      if (res.ok) { toast('Đã thêm vị trí'); void refreshOrg() } else toast(res.error ?? 'Lỗi thêm', 'err')
+    })
   },
 
   'page-sops': (raw) => {
     const root = document.getElementById('page-sops')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; title?: string; name?: string; updated_at?: string; status?: string }> })?.data) ?? []
-    patchKpiCards(root, [
-      { value: String(list.length), label: 'Total SOPs' },
-      { value: '0<em>%</em>', label: 'Compliance rate' },
-      { value: String(list.filter((s) => s.updated_at && new Date(s.updated_at).getTime() > Date.now() - 7 * 86400000).length), label: 'Updated this wk' },
-      { value: '0', label: 'Need review 30d' },
-    ])
+    type Step = { no: number; action: string; owner?: string; sla_hours?: number }
+    type Sop = { id: string; code?: string; title_vi: string; unit_code?: string; purpose_vi?: string; steps?: Step[]; frequency?: string; status: string; version?: number }
+    type Payload = { sops?: Sop[]; summary?: { total: number; active: number; draft: number; units_covered: number } }
+    const FREQ_VI: Record<string, string> = {
+      daily: 'Hằng ngày', weekly: 'Hằng tuần', monthly: 'Hằng tháng',
+      quarterly: 'Hằng quý', yearly: 'Hằng năm', on_demand: 'Khi cần',
+    }
+    const render = (p: Payload) => {
+      const list = p.sops ?? []
+      const s = p.summary
+      patchKpiCards(root, [
+        { value: String(s?.total ?? list.length), label: 'Quy trình (SOP)' },
+        { value: String(s?.active ?? 0), label: 'Đang áp dụng' },
+        { value: String(s?.draft ?? 0), label: 'Bản nháp' },
+        { value: `${s?.units_covered ?? 0}<em>/12</em>`, label: 'Phòng ban có SOP' },
+      ])
+      const rows = list.slice(0, 50).map((x) => {
+        const nSteps = (x.steps ?? []).length
+        const cls = x.status === 'active' ? 'ok' : x.status === 'deprecated' ? 'dim' : 'warn'
+        return `<tr><td><strong>${escapeHtml(x.title_vi)}</strong>${x.code ? `<br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(x.code)}</span>` : ''}<button data-del="${x.id}" title="Xoá" style="float:right;background:none;border:0;color:var(--dim);cursor:pointer;font-size:.8rem">✕</button></td><td>${escapeHtml(x.unit_code ?? '—')}</td><td class="num">${nSteps} bước</td><td>${escapeHtml(FREQ_VI[x.frequency ?? ''] ?? '—')}</td><td><span class="st ${cls}">${escapeHtml(x.status)}</span></td></tr>`
+      })
+      patchTable(root, '.card', rows, 'Chưa có SOP. Quy trình lặp >3 lần/tháng mà chưa chuẩn hoá = công ty phụ thuộc người, không scale được.', 5)
+      wireEach(root, 'button[data-del]', async (el) => {
+        const id = el.getAttribute('data-del')
+        if (!id || !window.confirm('Xoá quy trình này?')) return
+        const r = await apiSend(`/api/sops/${id}`, 'DELETE')
+        if (r.ok) { toast('Đã xoá'); void refresh() } else toast(r.error ?? 'Lỗi xoá', 'err')
+      })
+    }
+    const refresh = async () => { const r = await apiSend('/api/sops', 'GET'); if (r.ok) render(r.data as Payload) }
+    render(((raw as { data?: Payload })?.data) ?? {})
+    ensureHeaderButton(root, 'za-add-sop', '+ Quy trình', async () => {
+      const v = await openFormModal({
+        title: 'Tạo quy trình vận hành (SOP)',
+        fields: [
+          { name: 'title_vi', label: 'Tên quy trình', required: true, placeholder: 'Đóng sổ tháng · Onboard khách mới…' },
+          { name: 'unit_code', label: 'Phòng ban', type: 'select', options: [['exec', 'Ban điều hành'], ['finance', 'Tài chính'], ['sales', 'Kinh doanh'], ['marketing', 'Marketing'], ['product', 'Sản phẩm'], ['tech', 'Công nghệ'], ['operations', 'Vận hành'], ['hr', 'Nhân sự'], ['legal', 'Pháp chế'], ['governance', 'Quản trị'], ['ir', 'Quan hệ NĐT'], ['security', 'An ninh']].map(([v2, l]) => ({ value: v2, label: l })) },
+          { name: 'code', label: 'Mã SOP', placeholder: 'FIN-01' },
+          { name: 'purpose_vi', label: 'Mục đích', type: 'textarea' },
+          { name: 'steps', label: 'Các bước (mỗi dòng 1 bước)', type: 'textarea', placeholder: 'Thu thập chứng từ\nĐối chiếu ngân hàng\nLập báo cáo' },
+          { name: 'frequency', label: 'Tần suất', type: 'select', options: Object.entries(FREQ_VI).map(([v2, l]) => ({ value: v2, label: l })) },
+          { name: 'sla_hours', label: 'SLA (giờ)', type: 'number' },
+          { name: 'status', label: 'Trạng thái', type: 'select', options: [['draft', 'Nháp'], ['active', 'Áp dụng'], ['deprecated', 'Ngừng']].map(([v2, l]) => ({ value: v2, label: l })) },
+        ],
+        submitLabel: 'Tạo SOP',
+      })
+      if (!v) return
+      const steps = String(v.steps ?? '').split('\n').map((t) => t.trim()).filter(Boolean)
+        .slice(0, 50).map((action, i) => ({ no: i + 1, action }))
+      const res = await apiSend('/api/sops', 'POST', {
+        title_vi: v.title_vi, unit_code: v.unit_code || undefined, code: v.code || undefined,
+        purpose_vi: v.purpose_vi || undefined, steps, frequency: v.frequency || undefined,
+        sla_hours: num(v.sla_hours), status: v.status || 'draft',
+      })
+      if (res.ok) { toast('Đã tạo SOP'); void refresh() } else toast(res.error ?? 'Lỗi tạo', 'err')
+    })
   },
 
   'page-investors': (raw) => {
