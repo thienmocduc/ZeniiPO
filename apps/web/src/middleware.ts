@@ -54,8 +54,18 @@ export async function middleware(request: NextRequest) {
     });
   }
 
+  // Machine-to-machine endpoints: authenticated by a custom header token, not
+  // by cookies. CSRF and bot-UA heuristics don't apply — a browser can't attach
+  // `X-Zeni-Ingest-Token` cross-origin, and the callers here ARE scripts
+  // (Google Apps Script, MISA export in Python, Lark automation, cron).
+  // The endpoints do their own auth: ingest verifies a hashed token, cron
+  // verifies CRON_SECRET.
+  const path = request.nextUrl.pathname;
+  const isMachineEndpoint =
+    path.startsWith('/api/ingest') || path.startsWith('/api/cron');
+
   // 2. CSRF on state-changing methods (POST/PUT/PATCH/DELETE)
-  if (!validateCsrf(request)) {
+  if (!isMachineEndpoint && !validateCsrf(request)) {
     return new NextResponse('CSRF detected', {
       status: 403,
       headers: headersObject(),
@@ -66,8 +76,9 @@ export async function middleware(request: NextRequest) {
   const ua = request.headers.get('user-agent') || '';
   const isBot = /python-requests|scrapy|bot|crawl|spider/i.test(ua);
   const isPublicApi =
-    request.nextUrl.pathname.startsWith('/api/public') ||
-    request.nextUrl.pathname.startsWith('/api/health');
+    path.startsWith('/api/public') ||
+    path.startsWith('/api/health') ||
+    isMachineEndpoint;
   if (isBot && !isPublicApi) {
     return new NextResponse('Forbidden', {
       status: 403,
