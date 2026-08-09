@@ -15,12 +15,14 @@ const navLinks = [
   { href: '#faq', label: 'FAQ' },
 ];
 
+// Số liệu THẬT từ nền tảng — không ước lệ (10 bước journey · 53 trang module ·
+// 108 agent catalog · 31 benchmark VC/banker · 3 phương pháp định giá).
 const statsProof = [
-  { n: '10', label: 'phase' },
-  { n: '44', label: 'module' },
-  { n: '108', label: 'agent' },
-  { n: '420', label: 'step' },
-  { n: '2', label: 'ngôn ngữ VN/EN' },
+  { n: '10', label: 'bước Idea→IPO' },
+  { n: '53', label: 'module' },
+  { n: '108', label: 'AI agent' },
+  { n: '31', label: 'benchmark ngành' },
+  { n: '3', label: 'phương pháp định giá' },
 ];
 
 const problems = [
@@ -33,10 +35,10 @@ const problems = [
 ];
 
 const solutions = [
-  'Cap Table on-chain — mỗi cổ đông, mỗi vesting, mỗi option đều có hash',
+  'Cap Table hash-chain bất biến — mỗi cổ đông, mỗi vesting, mỗi option đều có hash, sửa lén là lộ',
   'OKR cascade 12 tầng — tư tưởng Chairman chảy xuống tận từng junior',
   'Data Room scoped theo NDA — ai xem gì, khi nào, export nào đều log',
-  'Financial Model sync real-time với ERP, kế toán, payroll — 1 nguồn số',
+  'Financial Model chuẩn VAS — mọi dòng tiền map hệ tài khoản kế toán, kế hoạch khớp sổ thật từng đồng',
   'IPO Readiness Scorecard 20 tiêu chí — điểm số thật, cảnh báo thật',
   'Compliance auto-alert — SGX, HOSE, HNX, UPCOM đều lên lịch sẵn',
 ];
@@ -181,7 +183,7 @@ const plans: Plan[] = [
     vnd: '~1.250.000đ / tháng',
     bullets: [
       '1 công ty, 10 nhân sự',
-      'Cap Table on-chain',
+      'Cap Table hash-chain bất biến',
       'Fundraise Pipeline 8 stage',
       'Academy 50 bài handbook',
       'Email support 48h',
@@ -200,7 +202,7 @@ const plans: Plan[] = [
       'Chairman Cascade 12 tier đầy đủ',
       '20 AI agent trong Legion',
       'Data Room scoped permission',
-      'Slack / Teams integration',
+      'Đấu nối dữ liệu Google Sheets · Larksuite · MISA',
     ],
     cta: 'Chọn Pro',
     href: '/signup?plan=pro',
@@ -229,7 +231,7 @@ const plans: Plan[] = [
       'Unlimited công ty & nhân sự',
       'On-prem hoặc private cloud VN',
       'Custom agent training (SOP nội bộ)',
-      'SOC2 · ISO 27001 · VN PDPA',
+      'Bảo mật RLS đa tầng · audit log · chuẩn NĐ13',
       '24/7 war-room IPO support',
     ],
     cta: 'Liên hệ sales',
