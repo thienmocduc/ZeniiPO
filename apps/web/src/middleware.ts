@@ -62,7 +62,10 @@ export async function middleware(request: NextRequest) {
   // verifies CRON_SECRET.
   const path = request.nextUrl.pathname;
   const isMachineEndpoint =
-    path.startsWith('/api/ingest') || path.startsWith('/api/cron');
+    path.startsWith('/api/ingest') ||
+    path.startsWith('/api/cron') ||
+    // ZIPO-201: ZeniOS gọi contract bằng x-internal-key + x-user-id
+    path.startsWith('/api/internal');
 
   // 2. CSRF on state-changing methods (POST/PUT/PATCH/DELETE)
   if (!isMachineEndpoint && !validateCsrf(request)) {
