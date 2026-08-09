@@ -1,109 +1,102 @@
-# ZENIIPO — BỘ TICKET "BUSINESS BRAIN V1" (bàn giao build tiếp · 2026-08-06)
+# ZENIIPO — BỘ TICKET "BUSINESS BRAIN V1" (bản 2 · 2026-08-06 — CẬP NHẬT SAU KHI SCHEMA ĐÃ CONVERT XONG)
 
-> **Cho đội ZeniIPO.** Chairman đã chốt kiến trúc 3 tầng cho cả hệ Zeni:
-> **ZeniIPO = PLAN** (thiết kế business: BMC · financial model · masterplan · vốn) → **ZeniOS = DECISION** (nhận target, so plan-vs-actual, ra quyết định) → **ZeniERP = ACTUAL** (sổ kế toán VAS, bất biến).
-> Bản repo hiện tại (54 màn) đã phủ ~85% hành trình — RẤT TỐT. Bộ ticket này là 15% còn thiếu + 3 khoản nợ nền tảng, viết đủ chi tiết để build không phải hỏi lại. Có gì mơ hồ: hỏi chairman/Claude trước khi tự đoán.
+> **Cho đội ZeniIPO.** Kiến trúc 3 tầng chairman đã chốt: **ZeniIPO = PLAN** (BMC · financial model · masterplan · vốn) → **ZeniOS = DECISION** (target, variance, quyết định) → **ZeniERP = ACTUAL** (sổ VAS bất biến).
+> **Thay đổi so bản 1:** đội core (Claude) đã làm xong phần schema + chuẩn bị deploy — EPIC 0 giờ chỉ còn THI HÀNH theo runbook, không còn phải tự convert gì. Đọc kỹ mục "ĐÃ CÓ SẴN" trước khi làm để không làm trùng.
 
-## ⛔ 8 RÀNG BUỘC KIẾN TRÚC (áp cho MỌI ticket — vi phạm = không merge)
-1. **SSoT phân tầng**: IPO sở hữu PLAN · OS sở hữu cap-table/data-room/decision · ERP sở hữu sổ. IPO **không tạo bảng** cho dữ liệu nhà khác — chỉ đọc API.
-2. **Chung ngôn ngữ số**: mọi dòng tiền kế hoạch map **hệ tài khoản VAS** (danh mục ở ZIPO-102) + kỳ THÁNG + company_id. Không có dòng P&L "tự do".
-3. **Plan version hoá — immutable sau publish**: sửa kế hoạch = tạo version mới; version cũ giữ vĩnh viễn (nhà đầu tư soi "hứa vs làm").
-4. **Tiền = BIGINT VND** (hoặc minor-unit USD) — cấm float; tỷ lệ/%/ratio tính runtime, không lưu.
-5. **Mọi số hiển thị kèm nhãn nguồn** `{nguồn · thời điểm}` — số không nguồn là bug.
-6. **Tài liệu investor-facing**: sinh từ snapshot immutable + bắt buộc human-review — AI chỉ đề xuất.
-7. **Fail-closed**: input âm/thiếu → throw, không đoán; nguồn chưa nối → hiện "chưa đo được", không ước.
-8. **Test acceptance là điều kiện DONE** — mỗi ticket có AC đo được bên dưới; thiếu evidence = chưa xong.
+## ✅ ĐÃ CÓ SẴN (đội core làm xong — KHÔNG làm lại)
+| Thứ | Ở đâu | Trạng thái |
+|---|---|---|
+| **29 migrations chuẩn Zeni Postgres** (convert từ 28 bản Supabase + `00_zeni_stub`) | `packages/database/zenicloud/*.sql` | ✅ Verify 3 vòng idempotent 29/29 EXIT_OK trên DB thử; sanity 108 agent · 32 module · 8 tenant không nhân đôi |
+| Ghi chú convert từng thay đổi | `packages/database/zenicloud/CONVERSION_NOTES.md` | ✅ Đọc TRƯỚC khi đụng DB |
+| `.gcloudignore` (repo 285MB → gọn khi build) | repo root | ✅ |
+| Entry deploy `zeniipo` (image tag theo git-sha) | `Zeni-Digital-Web3/scripts/deploy-zeni-cloud.mjs` | ✅ Sẵn — chạy 1 lệnh khi có PAT |
+| Bản gốc Supabase migrations | `packages/database/supabase/migrations/` | Giữ nguyên làm đối chiếu — KHÔNG sửa |
 
----
+## ⛔ 2 NÚT CHẶN NGOÀI CODE (chairman đang xử — theo dõi, không chờ mù)
+1. **Billing GCP `zeni-cloud-prod` delinquent** → build image đang bị chặn. Chairman đang gỡ (thanh toán hoặc link sang billing account đang sống).
+2. **PAT Zeni Cloud** (`zeni_pat_…`) — cần cho bước deploy qua Platform API.
 
-## EPIC 0 — NỀN TẢNG (làm TRƯỚC, chặn mọi thứ khác)
-
-### ZIPO-001 · Di trú hạ tầng: Vercel + Supabase → Zeni Cloud 〔P0 · blocker〕
-**Bối cảnh:** zeniipo.com đang chết (HTTP 402 Vercel DEPLOYMENT_DISABLED); hạ tầng ngoài trái chuẩn tập đoàn (mọi app chạy Zeni Cloud).
-**Việc:**
-- Build image bằng `Dockerfile` sẵn ở root (multi-stage pnpm+turbo → Next standalone) → đẩy registry `asia-southeast1-docker.pkg.dev/zeni-cloud-prod/zeni-cloud/zeniipo:<git-sha>`.
-- Deploy qua Zeni Cloud Platform API (`POST /api/v1/projects?ws=zeni-digital-saas-business`, cần PAT chairman cấp) — **không set env `PORT`**, **không set secret `DATABASE_URL`** (platform tự inject).
-- Chuyển 28 migrations `packages/database/supabase/migrations/` → chạy trên Zeni Postgres (schema tương thích — bỏ phần supabase-specific: `auth.users` của Supabase thay bằng `auth.users` chuẩn Zeni đã có; RLS dùng GUC `app.uid` thay `auth.uid()` của Supabase — xem mẫu tại repo Zeni-Digital-Web3 `ops/db-setup/sql/01_init.sql`).
-- Trỏ DNS zeniipo.com → service mới.
-**AC:** zeniipo.com trả 200 · toàn bộ migrations chạy idempotent trên Zeni Postgres · 0 tham chiếu `supabase.co` trong network tab khi dùng app.
-
-### ZIPO-002 · Thay Supabase Auth → Zeni ID SSO 〔P0〕
-**Bối cảnh:** cả hệ dùng 1 tài khoản Zeni ID (`zenicloud.io/api/v1/auth/*`); hub đăng nhập tập trung.
-**Việc:** bỏ `lib/supabase/client.ts + middleware.ts` → session cookie Zeni ID (xem mẫu `zeni-hub/src/lib/zeni/session.ts` + `proxy.ts` refresh ngầm ở repo Web3); login = redirect về Hub `/auth?continue=<url>`; user record upsert `auth.users(id=Zeni-ID-UUID, email)`.
-**AC:** đăng nhập bằng tài khoản Zeni ID thật vào được dashboard · phiên tự gia hạn (không bị đá sau 60') · logout sạch cookie · 0 import supabase trong `apps/web/src`.
-
-### ZIPO-003 · Cap-table: bỏ bảng riêng → đọc API ZeniOS (SSoT) 〔P0〕
-**Bối cảnh:** migration `019_captable_hashchain.sql` tạo cap-table riêng — vi phạm luật SSoT (cap-table sống ở ZeniOS, event-sourced).
-**Việc:** GIỮ nguyên UI màn cap-table (đẹp) — đổi data source: `GET {OS}/api/internal/cap-table?tenant=` (headers `x-internal-key` + `x-user-id` = uid phiên thật — RLS giữ nguyên chuỗi); mô phỏng pha loãng GỌI funding-engine của OS qua API (1 engine toàn hệ); GHI vòng vốn mới = `POST` về OS có approval, IPO không INSERT thẳng. Drop bảng cap-table local sau khi chuyển xong (migration mới, giữ bảng cũ read-only 30 ngày để đối chiếu).
-**AC:** màn cap-table hiện đúng số từ OS kèm nhãn `nguồn: zenios · <thời điểm>` · grep 0 INSERT/UPDATE vào bảng cap local · thử sửa trực tiếp → không có đường (route/API đã gỡ).
+## ⛔ 8 RÀNG BUỘC KIẾN TRÚC (giữ nguyên từ bản 1 — vi phạm = không merge)
+1. SSoT phân tầng: IPO sở hữu PLAN · OS sở hữu cap-table/data-room/decision · ERP sở hữu sổ — IPO không tạo bảng cho dữ liệu nhà khác, chỉ đọc API.
+2. Chung ngôn ngữ số: mọi dòng tiền kế hoạch map hệ tài khoản VAS + kỳ THÁNG + company_id.
+3. Plan version hoá — immutable sau publish.
+4. Tiền = BIGINT; tỷ lệ tính runtime.
+5. Mọi số hiển thị kèm nhãn nguồn `{nguồn · thời điểm}`.
+6. Tài liệu investor-facing: snapshot immutable + human-review bắt buộc.
+7. Fail-closed: input sai → throw; nguồn chưa nối → "chưa đo được", không ước.
+8. Test acceptance là điều kiện DONE — thiếu evidence = chưa xong.
 
 ---
 
-## EPIC 1 — BUSINESS DESIGN STUDIO (tầng PLAN)
+## EPIC 0 — DEPLOY ĐÚNG DỮ LIỆU LÊN ZENI CLOUD (runbook thi hành theo THỨ TỰ — mỗi bước có lệnh + kiểm chứng)
 
-### ZIPO-101 · Màn Business Model Canvas 9 khối (version hoá) 〔P1〕
-**Bối cảnh:** hành trình thiết kế bắt đầu từ BMC — repo chưa có màn này (grep canvas/BMC = 0).
-**Spec:** 9 khối chuẩn Osterwalder: Phân khúc khách hàng · Giá trị cốt lõi · Kênh · Quan hệ khách hàng · Dòng doanh thu · Nguồn lực chính · Hoạt động chính · Đối tác chính · Cơ cấu chi phí. Mỗi khối = list items (text + tag). Bảng `business_models (id, tenant_id, version, blocks jsonb, status draft|published, published_at)`. Autosave draft; publish = khoá (immutable — trigger DB chặn UPDATE bản published, sửa = version mới). Nút "Sinh nháp bằng AI" (gọi router, output đề xuất gắn nhãn "AI đề xuất — chưa áp dụng", user bấm từng item để nhận — **0 item tự vào canvas**).
-**AC:** tạo → autosave → publish → UPDATE bản published bị DB chặn · version 2 tạo được và diff hiển thị khối nào đổi · AI draft không tự ghi (đếm items sau draft = 0 khi chưa accept).
+### ZIPO-001a · Build image lên registry 〔chạy được NGAY khi billing sống〕
+```bash
+cd Zeni-iPO
+gcloud builds submit . --project zeni-cloud-prod \
+  --account zeni-cloud-deployer@zeni-cloud-prod.iam.gserviceaccount.com \
+  --region asia-southeast1 \
+  --tag asia-southeast1-docker.pkg.dev/zeni-cloud-prod/zeni-cloud/zeniipo:$(git rev-parse --short HEAD)
+```
+**Kiểm chứng DONE:** build SUCCESS + digest sha256 in ra; `.gcloudignore` có hiệu lực (archive < 20MB, KHÔNG phải 285MB).
 
-### ZIPO-102 · Chart of Accounts mapping — "ngôn ngữ chung" của financial model 〔P1 · nền của mọi ticket EPIC 2〕
-**Bối cảnh:** kế hoạch phải so được với sổ thật TỪNG DÒNG → mọi line kế hoạch map TK VAS.
-**Spec:** bảng `plan_coa_lines (code, label_vi, statement pnl|cf|bs, sign)` seed tối thiểu:
-`5111 Doanh thu bán hàng · 5113 Doanh thu dịch vụ · 521 Giảm trừ · 632 Giá vốn · 6411 CP bán hàng-nhân sự · 6417 CP marketing · 6421 CP quản lý-nhân sự · 6427 CP thuê văn phòng · 635 CP tài chính · 515 DT tài chính · 711 Thu nhập khác · 811 CP khác · 821 CP thuế TNDN` (+ mở rộng theo nhu cầu, code phải là prefix hợp lệ của COA VAS thật — đối chiếu `coa_accounts` bên ZeniERP).
-Form nhập model: mỗi dòng doanh thu/chi phí BẮT BUỘC chọn coa_line từ danh mục — không có ô text tự do cho tên dòng tiền.
-**AC:** tạo model có dòng không map COA → validate chặn · export plan (ZIPO-201) mọi row có coa_line hợp lệ.
+### ZIPO-001b · Deploy service qua Platform API (cần PAT — KHÔNG deploy raw gcloud)
+```bash
+cd Zeni-Digital-Web3
+ZENI_TOKEN=<PAT_chairman_cấp> node scripts/deploy-zeni-cloud.mjs --only=zeniipo
+```
+Ghi nhớ: **không** set env `PORT`, **không** set secret `DATABASE_URL` (platform tự inject socket /cloudsql + gắn Cloud SQL instance). Nếu API báo image không được phép → nhờ chairman POST image-whitelist prefix (đã có prefix `asia-southeast1-docker.pkg.dev/zeni-cloud-prod/zeni-cloud/` từ trước — thường không cần).
+**Kiểm chứng DONE:** `GET /projects?ws=zeni-digital-saas-business` thấy `zeniipo` status `running` + có `domain` (URL *.run.app).
 
-### ZIPO-103 · Financial Model Engine chuẩn MBA — assumptions → P&L/CF 36–60 tháng 〔P1 · trái tim〕
-**Bối cảnh:** màn `financial-model/studio.tsx` có UI — cần engine tất định chuẩn bên dưới (hiện chưa map COA, chưa chuẩn công thức).
-**Spec công thức (pure function, test số cứng từng công thức):**
-- **Revenue build-up** (per dòng doanh thu, per company): `revenue[m] = price[m] × volume[m]`; `volume[m] = volume[m-1] × (1+growth_m)`; SaaS: `MRR[m] = MRR[m-1] × (1 + new_rate − churn_rate)`; doanh thu ghi vào coa 5111/5113.
-- **COGS**: `cogs[m] = revenue[m] × cogs_pct` HOẶC `unit_cost × volume` (chọn per dòng) → 632.
-- **OPEX**: nhân sự = `Σ headcount_plan[m][role] × salary[role] × (1 + insurance_pct)` → 6411/6421; marketing = `budget[m]` hoặc `CAC × new_customers[m]` → 6417; thuê + khác = lịch cố định → 6427.
-- **EBITDA = revenue − 521 − 632 − 641x − 642x**; **EBT = EBITDA − 635 + 515 + 711 − 811**; **thuế 821 = max(0, EBT) × 20%** (thuế suất TNDN VN — config `effective_from`, không hardcode); **net = EBT − 821**.
-- **Cash Flow gián tiếp**: `CF[m] = net[m] + Δworking_capital`; WC từ 3 tham số chuẩn: `DSO` (ngày phải thu — AR = revenue×DSO/30), `DPO` (phải trả), `DIO` (tồn kho); `cash[m] = cash[m-1] + CF[m] + equity_in[m] − capex[m]`.
-- **3 kịch bản** base/bull/bear: mỗi assumption có 3 giá trị (hoặc multiplier) — engine chạy 3 lần, KHÔNG copy model.
-- **Sensitivity (màn sẵn có — nối engine)**: tornado ±10/20% từng assumption → Δ EBITDA năm 3, xếp hạng.
-- Bất biến kiểm trong engine: `Σ 12 tháng = tổng năm` từng dòng (integer, VND); `cash[m]` liên tục (cuối m = đầu m+1); âm assumption → throw.
-**AC:** bộ test ≥12 case số cứng (mỗi công thức ≥1) pass · 3 kịch bản chạy từ 1 bộ assumptions · sensitivity ra bảng xếp hạng · mọi output row mang coa_line.
+### ZIPO-001c · DỰNG DỮ LIỆU: chạy 29 migrations lên DB prod — THỨ TỰ BẮT BUỘC
+Chạy qua job `ops/db-setup` (pattern zenios-saas) hoặc runner `zenios/scripts/run-sql.ts` với connection prod do chairman cấp phiên. **Tuyệt đối theo thứ tự tên file** (00 → 001 → … → 028):
+```
+00_zeni_stub.sql   ← LUÔN ĐẦU TIÊN (auth schema + GUC + roles authenticated/anon/service_role)
+001_auth_rbac.sql … 028_modes_and_connectors.sql
+```
+Quy tắc an toàn prod:
+- DB đích: **database RIÊNG cho zeniipo** trên instance `zeni-tenant-db` (vd `zeni_ipo`) — KHÔNG đổ chung vào `zeni_digital_saas_business` (28 bảng khác domain, tránh giẫm tên bảng OS/ERP). Tạo DB mới `ENCODING 'UTF8' TEMPLATE template0` (bài học WIN1252 trong CONVERSION_NOTES).
+- Chạy 2 LẦN liên tiếp — lần 2 phải sạch y như lần 1 (idempotent đã verify ở dev; prod phải lặp lại được kết quả đó).
+**Kiểm chứng DONE:** cả 2 lần 29/29 EXIT_OK · đếm sanity: `agent_catalog=108, modules_catalog=32` · `SELECT auth.uid()` trả NULL khi chưa set GUC.
 
-### ZIPO-104 · Plan versioning + Publish + Diff 〔P1〕
-**Spec:** `plan_versions (id, tenant_id, version_no, model_ref, status draft|published, published_by, published_at)` — publish trong 1 transaction: khoá version (trigger immutable) + sinh `plan_targets` (ZIPO-201). Màn diff v(n) vs v(n−1): assumption nào đổi, dòng P&L nào đổi >X%.
-**AC:** publish → UPDATE version bị DB chặn · diff hiển thị đúng 3 thay đổi test · v cũ query được nguyên vẹn.
+### ZIPO-001d · Seed/Import dữ liệu nghiệp vụ
+- Seed catalog (agent/module/journey template) ĐÃ NẰM TRONG migrations — không seed tay.
+- **Data người dùng cũ trên Supabase (`moduqdlwgbmvlwiiicqp`)**: chairman xác nhận 1 trong 2:
+  (a) *data test → BỎ* — không import gì, hệ sạch;
+  (b) *data quý → chairman lấy Database password (Supabase dashboard → Settings → Database)* → dump `pg_dump --data-only --exclude-schema=auth --exclude-schema=storage` → rà mapping user id (auth.users Supabase → Zeni ID UUID — bảng đối chiếu email) → import. Mọi row import giữ nguyên timestamps.
+**Kiểm chứng DONE:** biên bản 5 dòng ghi rõ đã chọn (a) hay (b) + số row import từng bảng (nếu b).
 
----
+### ZIPO-002 · Thay Supabase Auth → Zeni ID SSO 〔làm SONG SONG 001a-c, PHẢI xong trước khi mở public〕
+Bỏ `lib/supabase/{client,middleware}.ts` → session cookie Zeni ID (mẫu: `Zeni-Digital-Web3/zeni-hub/src/lib/zeni/session.ts` + `proxy.ts` refresh ngầm + **memo token TTL 60s** — bắt buộc copy pattern memo này, không có nó mỗi trang chậm ~2s vì gọi /auth/me nhiều lần). Login = redirect Hub `/auth?continue=<url>`. Upsert `auth.users(id=UUID Zeni ID, email)` khi phiên mới.
+**Kiểm chứng DONE:** đăng nhập tài khoản Zeni ID thật vào dashboard · phiên không bị đá sau 60' · 0 import supabase trong `apps/web/src` (grep) · trang load < 1s sau đăng nhập.
 
-## EPIC 2 — "THÔNG HÀM SỐ" PLAN → RUN → RECORD
+### ZIPO-003 · Cap-table đổi nguồn sang API ZeniOS 〔sau 002〕
+GIỮ UI — đổi data source sang `GET {OS}/api/internal/cap-table` (headers `x-internal-key` + `x-user-id`); dilution gọi funding-engine OS; ghi vòng mới = POST về OS có approval. Bảng cap local: đóng ghi (read-only 30 ngày đối chiếu) → drop.
+**Kiểm chứng DONE:** số cap-table hiện từ OS kèm nhãn nguồn · grep 0 INSERT/UPDATE bảng cap local.
 
-### ZIPO-201 · Bảng plan_targets + Internal API cho ZeniOS 〔P1〕
-**Spec:** `plan_targets (id, tenant_id, plan_version_id, company_id, period date (ngày 01), coa_line, amount bigint, metric_key null)` — sinh tự động lúc publish (từ output engine 103). API: `GET /api/internal/plan-targets?tenant=<slug>&version=<n|active>` — auth 2 lớp: header `x-internal-key` (server-to-server) + `x-user-id` (uid phiên thật bên OS — giữ nguyên chuỗi RLS; xem mẫu `zenierp/src/app/api/internal/pnl-summary/route.ts` repo Web3). GET only; sai key 401; POST 405.
-**AC:** curl 3 case 200/401/405 · cross-tenant: uid không thuộc tenant → rows rỗng · số trả về khớp engine từng đồng (test đối chiếu).
-
-### ZIPO-202 · [PHỐI HỢP — OWNER: đội Zeni Digital core] OS nhận target + variance
-**Ghi để biết ranh giới, KHÔNG build bên IPO:** OS sẽ có `plan-client` + engine `variance.ts` + rule `revenue_miss` + màn Variance (tasks T720-T724 repo Web3). Bên IPO chỉ cần đảm bảo ZIPO-201 đúng contract.
-
-### ZIPO-203 · Bộ test xuyên 3 tầng — "hàm số thông" 〔P1 · gate nghiệm thu của chairman〕
-**Spec:** script tự động 1 lệnh: (1) publish plan v-test: revenue công ty A tháng T = 1.000.000.000 (coa 5111) → (2) gọi API plan-targets xác nhận đúng 1 tỷ → (3) ghi bút toán bên ERP 5111 = 900.000.000 posted (qua API/fixture ERP dev) → (4) OS variance = −10% + nguồn `plan:v-test` → (5) ngưỡng rule 5% → Decision Card sinh. Mỗi bước in PASS/FAIL.
-**AC:** script chạy pass cả 5 bước trên môi trường dev chung · chạy 2 lần không sinh card trùng (no-dup).
-
----
-
-## EPIC 3 — CHUẨN VỐN QUỐC TẾ (nâng các màn sẵn có)
-
-### ZIPO-301 · Stage-gate vốn: Seed→A→B→Pre-IPO→Listed có điều kiện ĐO ĐƯỢC 〔P2〕
-**Spec:** khung gate chuẩn (data version-controlled, không hardcode): mỗi giai đoạn = bộ tiêu chí máy đo được từ hệ, ví dụ chuẩn thị trường: Series A ~ `ARR ≥ $1M + tăng trưởng ≥15%/tháng 6 tháng + churn <3% + runway >12 tháng`; Pre-IPO VN ~ `2 năm BCTC kiểm toán + ROE dương + không lỗ luỹ kế (điều kiện HOSE NĐ155) + governance đủ (BKS, ĐHĐCĐ minutes)`. Mỗi tiêu chí `{metric, nguồn_api (ERP/OS/Law), threshold, trạng_thái: đạt|chưa|chưa-đo-được}` — nguồn chưa nối = "chưa đo được", cấm ước.
-**AC:** tenant demo đủ/thiếu hồ sơ biết trước → gate chấm đúng · đổi khung = data migration có duyệt, không sửa code.
-
-### ZIPO-302 · Unit Economics chuẩn — nối số THẬT 〔P2〕
-**Spec:** màn `clv-cac`/`burn` sẵn có — nối công thức chuẩn + nguồn thật: `CAC = chi phí S&M kỳ (641x từ ERP) ÷ khách mới`; `LTV = ARPA × gross_margin% ÷ churn`; `LTV/CAC` (chuẩn ≥3×); `CAC payback = CAC ÷ (ARPA × GM%)` tháng (chuẩn ≤12-18); `Burn Multiple = net burn ÷ net new ARR` (chuẩn <1.5 tốt); `Rule of 40 = growth% + FCF margin%`. Mỗi chỉ số hiện: giá trị + benchmark + nhãn nguồn (ERP kỳ nào).
-**AC:** số khớp tay trên fixture · thiếu nguồn → "chưa đo được".
-
-### ZIPO-303 · Readiness Score 6 trụ đọc dữ liệu thật 〔P2〕
-**Spec:** theo spec sản phẩm §10.2 (repo Web3 `docs/products/zeniipo.spec.md`): pure function, mỗi tiêu chí `{metric, nguon_api, gia_tri, threshold, ket_qua}`; trụ: tài chính (số kỳ khoá sổ liên tục từ ERP) · pháp lý (giấy phép Vault Law) · quản trị (nghị quyết OS) · cap-table (event-sourced sạch OS) · vận hành (OKR/kpi OS) · CBTT. Điểm tổng kèm % coverage (bao nhiêu tiêu chí đo được).
-**AC:** fixture đủ/thiếu → điểm đúng · coverage hiển thị · không trụ nào "ước".
+### ZIPO-004 · DNS + nghiệm thu cuối
+Chairman đổi DNS `zeniipo.com` → domain service mới (sau khi 001b-c-d + 002 PASS trên URL *.run.app). Smoke cuối: đăng nhập → onboarding wizard → dashboard → cap-table (đọc OS) → audit-log ghi nhận.
+**Kiểm chứng DONE:** zeniipo.com 200 · 5 bước smoke có screenshot · 0 request nào tới *.supabase.co / *.vercel.app (network tab).
 
 ---
+
+## EPIC 1 — BUSINESS DESIGN STUDIO (PLAN) 〔giữ nguyên bản 1〕
+- **ZIPO-101** BMC 9 khối version hoá (autosave draft · publish immutable · AI draft gắn nhãn "đề xuất", 0 item tự vào canvas).
+- **ZIPO-102** COA mapping — bảng `plan_coa_lines` seed: `5111 · 5113 · 521 · 632 · 6411 · 6417 · 6421 · 6427 · 635 · 515 · 711 · 811 · 821` (đối chiếu `coa_accounts` ZeniERP); mọi dòng model bắt buộc chọn từ danh mục.
+- **ZIPO-103** Financial Model Engine chuẩn MBA (pure + test số cứng ≥12): revenue build-up `price×volume` / MRR `(1+new−churn)`; COGS %-hoặc-unit; OPEX theo headcount×(lương+BH) + CAC×khách mới; EBITDA→EBT→thuế 20% (config effective_from)→net; **CF gián tiếp theo DSO/DPO/DIO**; cash liên tục tháng nối tháng; 3 kịch bản 1 bộ assumptions; sensitivity tornado; Σ12 tháng = năm (integer).
+- **ZIPO-104** plan_versions immutable sau publish + màn diff v(n)/v(n−1).
+
+## EPIC 2 — "THÔNG HÀM SỐ" 〔giữ nguyên bản 1〕
+- **ZIPO-201** `plan_targets (version × company × period × coa_line × amount bigint)` sinh lúc publish + API `GET /api/internal/plan-targets` (2 lớp key + uid pass-through — mẫu `zenierp/src/app/api/internal/pnl-summary/route.ts`). AC: 200/401/405 + cross-tenant rỗng + khớp engine từng đồng.
+- **ZIPO-202** [OWNER: đội Zeni Digital core] OS nhận target + variance + rule revenue_miss — bên IPO chỉ giữ đúng contract 201.
+- **ZIPO-203** Test xuyên 3 tầng 1 lệnh: plan 1 tỷ → OS target → ERP bút toán 900tr → variance −10% → Decision Card. 5 bước PASS/FAIL, chạy 2 lần không card trùng. **Đây là gate nghiệm thu của chairman.**
+
+## EPIC 3 — CHUẨN VỐN QUỐC TẾ 〔giữ nguyên bản 1〕
+- **ZIPO-301** Stage-gate Seed→Listed điều kiện máy đo được (Series A ~ ARR $1M · churn <3% · runway >12th; Pre-IPO VN theo NĐ155/HOSE: 2 năm BCTC kiểm toán · ROE dương · không lỗ luỹ kế · governance đủ) — data version-controlled, nguồn chưa nối = "chưa đo được".
+- **ZIPO-302** Unit economics nối số thật ERP: CAC = S&M(641x)÷khách mới · LTV = ARPA×GM%÷churn · LTV/CAC ≥3× · payback ≤12-18th · Burn Multiple <1.5 · Rule of 40.
+- **ZIPO-303** Readiness 6 trụ pure function `{metric, nguon_api, gia_tri, threshold, ket_qua}` + % coverage — không trụ nào ước.
 
 ## DEFINITION OF DONE (mọi ticket)
-Build 0 lỗi + test AC pass có log dán vào PR · không vi phạm 8 ràng buộc đầu file · số demo dùng tenant demo (không số thật Zeni Holdings khi chưa duyệt) · UI theo design system sẵn có của repo · mọi PR ghi rõ ticket ID.
+Build 0 lỗi + AC pass có log dán PR · không vi phạm 8 ràng buộc · demo dùng tenant demo (số thật Zeni Holdings phải chairman duyệt trước khi lộ) · UI theo design system sẵn có · PR ghi ticket ID.
 
-*Thắc mắc kiến trúc → đối chiếu: `Zeni-Digital-Web3/docs/products/zeniipo.spec.md` (§0b PLAN-RUN-RECORD) + `docs/specs/007-zeniipo-brain/` (spec + tasks phía Zeni Digital). Hai bên gặp nhau ở contract ZIPO-201.*
+*Đối chiếu kiến trúc: `Zeni-Digital-Web3/docs/products/zeniipo.spec.md` (§0b) + `docs/specs/007-zeniipo-brain/`. Hai đội gặp nhau tại contract ZIPO-201.*
