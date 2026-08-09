@@ -8,6 +8,7 @@ import { FaqItem } from '@/components/landing/faq-item';
 
 const navLinks = [
   { href: '#problem', label: 'Vấn đề' },
+  { href: '#roles', label: 'Vai trò' },
   { href: '#features', label: 'Tính năng' },
   { href: '#cascade', label: 'Cascade' },
   { href: '#academy', label: 'Academy' },
@@ -41,6 +42,81 @@ const solutions = [
   'Financial Model chuẩn VAS — mọi dòng tiền map hệ tài khoản kế toán, kế hoạch khớp sổ thật từng đồng',
   'IPO Readiness Scorecard 20 tiêu chí — điểm số thật, cảnh báo thật',
   'Compliance auto-alert — SGX, HOSE, HNX, UPCOM đều lên lịch sẵn',
+];
+
+// Lợi ích & tiềm năng theo vai trò — nguyên văn từ docs/ZENIIPO_CONTENT_V1.md §3
+const roleBenefits = [
+  {
+    role: 'Doanh nghiệp & Startup',
+    tag: 'Con đường ngắn nhất đến vốn',
+    color: '#E4C16E',
+    points: [
+      'Số liệu kiểm chứng bằng sao kê ngân hàng + hoá đơn điện tử — ngôn ngữ mà ngân hàng và quỹ tin ngay',
+      'Hồ sơ vay vốn / gọi vốn chuẩn định chế xuất trong vài ngày thay vì nhiều tháng',
+      'Đội chuyên gia Zeni Pro (CFO · banker · luật · IR) trực 24/7 — chi phí bằng một phần nhỏ CFO thuê ngoài',
+    ],
+    potential:
+      'Vào chu kỳ IPO 2026-2030 với sổ sách đạt chuẩn từ ngày đầu — thế thượng phong khi đàm phán định giá.',
+  },
+  {
+    role: 'Nhà đầu tư',
+    tag: 'Thẩm định bằng dữ liệu',
+    color: '#a855f7',
+    points: [
+      'Deal-flow cùng một hệ quy chiếu: COA VAS, unit economics, readiness — so sánh táo với táo',
+      'Số liệu đã kiểm chứng độc lập (ngân hàng + thuế) — thời gian thẩm định rút ngắn nhiều lần',
+      'Toàn bộ danh mục theo dõi tại một nơi — lịch sử bất biến, truy cập có log',
+    ],
+    potential:
+      'Nguồn deal tư nhân chuẩn hoá đầu tiên tại Việt Nam — thông tin tốt hơn, quyết định tốt hơn.',
+  },
+  {
+    role: 'Quỹ VC/PE & Family Office',
+    tag: 'Sourcing có kỷ luật',
+    color: '#06b6d4',
+    points: [
+      'Deal-flow feed đúng khẩu vị: ngành · giai đoạn · ticket size — thay cho quét thủ công',
+      'Screening chuẩn banker: LTV:CAC, Rule of 40, Burn Multiple trên số kiểm chứng',
+      'Đồng hành vốn mỏ neo Zeni Capital — luật chơi minh bạch, mọi truy cập đều log',
+    ],
+    potential:
+      'Chi phí sourcing giảm, chất lượng pipeline tăng — theo đúng tiêu chí quỹ đặt ra.',
+  },
+  {
+    role: 'Ngân hàng & Định chế tài chính',
+    tag: 'Hồ sơ vay tự chuẩn hoá',
+    color: '#4ade80',
+    points: [
+      'Hồ sơ vay đối soát 3 nguồn: sổ sách · sao kê · hoá đơn điện tử — dữ liệu máy đọc được',
+      'Chi phí thẩm định giảm mạnh — mọi con số có nhãn nguồn và mức kiểm chứng',
+      'Tiếp cận tập SME đang minh bạch hoá — phân khúc tín dụng còn bỏ ngỏ',
+    ],
+    potential:
+      'Mở rộng tín dụng SME an toàn hơn bằng dữ liệu kiểm chứng — đúng định hướng ngành 2026-2030.',
+  },
+  {
+    role: 'Đối tác dịch vụ & White-label',
+    tag: 'Đúng khách, đúng thời điểm',
+    color: '#fb923c',
+    points: [
+      'Luật · kiểm toán · định giá · IR nhận yêu cầu đúng giai đoạn vốn của doanh nghiệp',
+      'Vườn ươm / quỹ / ngân hàng triển khai hạ tầng chuẩn hoá dưới thương hiệu riêng',
+      'Mọi giới thiệu có log — phí minh bạch, đối chiếu được',
+    ],
+    potential: 'Kênh khách hàng chất lượng cao tăng theo quy mô nền tảng.',
+  },
+  {
+    role: 'Học viên & Đội ngũ',
+    tag: 'Nghề CFO thế hệ mới',
+    color: '#ec4899',
+    points: [
+      'Học vận hành cơ chế vốn trên nền tảng thật — không phải slide',
+      'Đọc số như banker, dựng model như CFO — drill cùng chuyên gia AI Zeni Pro',
+      'Chứng chỉ IPO-Ready gắn với thực hành đo được',
+    ],
+    potential:
+      'Bộ kỹ năng được săn đón khi hàng nghìn doanh nghiệp chuẩn hoá theo cơ chế vốn.',
+  },
 ];
 
 type Feature = {
@@ -341,22 +417,26 @@ export default function Home() {
         >
           <div className="inline-flex items-center gap-2 text-2xs font-mono uppercase tracking-widest text-gold-light border border-gold/30 rounded-full px-4 py-1.5 mb-8 bg-gold/5">
             <span className="w-2 h-2 rounded-full bg-gold-light animate-pulse-soft" />
-            Ra mắt Beta · Apr 2026
+            Chu kỳ vốn 2026-2030 · Việt Nam nâng hạng thị trường
           </div>
 
           <h1 className="hero-h1 font-display font-semibold text-ivory max-w-6xl text-balance">
-            <span className="whitespace-nowrap">Từ Day-0</span>{' '}
+            Hệ điều hành{' '}
             <span className="whitespace-nowrap font-serif italic text-gold-light font-normal">
-              tư tưởng
+              cơ chế vốn
             </span>{' '}
-            <span className="whitespace-nowrap">đến ring-bell</span>{' '}
-            <span className="whitespace-nowrap cosmic-gradient-text font-display">SGX 2031</span>.
+            cho doanh nghiệp{' '}
+            <span className="whitespace-nowrap cosmic-gradient-text font-display">
+              chưa niêm yết
+            </span>
+            .
           </h1>
 
           <p className="mt-8 max-w-2xl text-lg md:text-xl text-ink-2 leading-relaxed">
-            Nền tảng điều hành IPO dành cho founder Việt Nam và Đông Nam Á. Zeniipo
-            cascade tư tưởng Chairman xuống 12 tầng, triển khai 108 AI agent 24/7,
-            đi thẳng từ Day-0 tới ring-bell — không cần ghép 20 công cụ rời rạc.
+            Vốn là một cơ chế, không phải sự kiện. ZeniIPO đưa doanh nghiệp vận hành
+            theo kỷ luật công ty đại chúng ngay từ đầu: số sạch kiểm chứng tới từng
+            đồng — hồ sơ vốn chuẩn định chế — kết nối thẳng nhà đầu tư và ngân hàng,
+            cùng đội chuyên gia AI Zeni Pro trực 24/7, con người phê duyệt mọi quyết định.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -368,10 +448,10 @@ export default function Home() {
               <ArrowRight size={18} />
             </Link>
             <a
-              href="#features"
+              href="#roles"
               className="inline-flex items-center gap-2 border border-w-16 text-ink text-base px-6 py-3.5 rounded hover:border-chakra-6-glow hover:text-chakra-7-violet transition-colors"
             >
-              Xem tính năng
+              Lợi ích cho vai trò của bạn
             </a>
           </div>
 
@@ -457,6 +537,67 @@ export default function Home() {
               </ul>
             </div>
           </div>
+        </section>
+
+        {/* ——— Roles · Lợi ích & tiềm năng theo vai trò ——— */}
+        <section
+          id="roles"
+          aria-labelledby="roles-h"
+          className="max-w-[1400px] mx-auto px-6 md:px-10 py-20 md:py-[120px] border-t border-w-6"
+        >
+          <div className="text-center mb-16">
+            <p className="font-mono text-2xs uppercase tracking-widest text-gold-light">
+              Một nền tảng · Mọi vai trò trong vòng đời vốn
+            </p>
+            <h2
+              id="roles-h"
+              className="mt-4 font-display text-4xl md:text-5xl font-semibold text-ivory max-w-3xl mx-auto text-balance"
+            >
+              Doanh nghiệp minh bạch — nhà đầu tư tin — ngân hàng giải ngân.
+            </h2>
+            <p className="mt-5 text-ink-2 max-w-2xl mx-auto">
+              Vốn chảy khi số liệu được kiểm chứng. Mỗi vai trò trong cơ chế vốn đều
+              nhận giá trị đo được — và cùng làm thị trường minh bạch hơn.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {roleBenefits.map((r) => (
+              <div
+                key={r.role}
+                className="bg-gradient-to-br from-panel to-panel-2 border border-w-6 rounded-card p-7 flex flex-col"
+                style={{ borderTop: `3px solid ${r.color}` }}
+              >
+                <p className="font-mono text-2xs uppercase tracking-widest text-ink-dim">
+                  {r.tag}
+                </p>
+                <h3 className="mt-2 font-display text-xl text-ivory">{r.role}</h3>
+                <ul className="mt-4 space-y-3 flex-1">
+                  {r.points.map((p, i) => (
+                    <li
+                      key={i}
+                      className="flex gap-2.5 text-sm text-ink-2 leading-relaxed"
+                    >
+                      <Check
+                        size={16}
+                        className="flex-shrink-0 mt-0.5 text-ok"
+                        strokeWidth={2.5}
+                      />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-5 pt-4 border-t border-w-6 text-sm text-gold-light/90 leading-relaxed">
+                  {r.potential}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-8 text-center text-xs text-ink-dim max-w-3xl mx-auto">
+            ZeniIPO cung cấp thông tin đã kiểm chứng phục vụ quyết định — nền tảng
+            không môi giới chứng khoán, không tư vấn đầu tư, không cam kết lợi nhuận.
+          </p>
         </section>
 
         {/* ——— Features ——— */}
