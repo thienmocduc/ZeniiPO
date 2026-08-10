@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createServerClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/zeni/session';
+import { isCurrentSuperAdmin } from '@/lib/zeni/superadmin';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 import { V1Modals } from '@/components/v1-modals';
@@ -16,37 +17,22 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  // Phiên Zeni ID (ZIPO-002) — tài khoản hệ sinh thái Zeni, fail-closed.
+  const user = await getSessionUser();
   if (!user) {
     redirect('/login');
   }
 
-  // Onboarding gate: if the tenant has no IPO journey yet, push the user
-  // through the 3-step wizard before any app page renders.
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .maybeSingle();
-  if (profile?.tenant_id) {
-    const { count } = await supabase
-      .from('ipo_journeys')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', profile.tenant_id);
-    // /onboarding is OUTSIDE this (app) layout, so redirect is loop-safe.
-    if ((count ?? 0) === 0) redirect('/onboarding');
-  }
+  // Onboarding gate tạm ngưng tới khi data layer nối DB zeni_ipo (ZIPO-001c):
+  // backend Supabase cũ đã bị thu hồi nên không còn nguồn để hỏi journey.
 
-  // Chairman-super sees the Zeni Console nav link (platform operator + holdings).
-  const { data: isSuper } = await supabase.rpc('is_chairman_super');
+  // Chế độ ADMIN (lệnh chairman): superadmin theo email Zeni ID → thấy Console
+  // + toàn quyền mọi tenant Zeni Holdings (RLS bật qua app.is_superadmin).
+  const showConsole = await isCurrentSuperAdmin();
 
   // Pull sidebar markup from v1_8 source and rewire <div data-page> → <a href="/route">
   const sidebarHtml = rewriteSidebarForNextLinks(getSidebarInner(), {
-    showConsole: Boolean(isSuper),
+    showConsole,
   });
   // Pull the v1_8 inline <script> block — V1Interactivity executes it once
   // on mount so role switcher, agent modals, drills, command palette,
@@ -55,7 +41,12 @@ export default async function AppLayout({
 
   return (
     <>
-      <Topbar user={user} />
+      <Topbar
+        user={{
+          email: user.email ?? undefined,
+          user_metadata: { name: user.name ?? null },
+        }}
+      />
       <div className="app">
         <Sidebar html={sidebarHtml} />
         <main className="main">{children}</main>

@@ -49,6 +49,9 @@ const nextConfig = {
   // can't see arbitrary readFileSync paths — include it explicitly.
   outputFileTracingIncludes: {
     '/**': ['./src/lib/v1/source.html'],
+    // db-setup đọc bộ migrations lúc runtime — tracer không thấy readFileSync
+    // động nên phải khai báo tường minh (đường dẫn tương đối apps/web).
+    '/api/internal/db-setup': ['../../packages/database/zenicloud/**/*.sql'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {

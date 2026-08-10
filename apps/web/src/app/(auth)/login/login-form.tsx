@@ -2,15 +2,13 @@
 
 /**
  * LoginForm — renders the exact <div class="login" id="login"> markup from
- * v1_8_FULL.html and wires the submit button (#loginBtn) to Supabase
- * email/password auth. Keeps role + company fields as UI-only (matches the
- * chairman's v1 seed — binding to RLS is a v2 task).
+ * v1_8_FULL.html and wires the submit button (#loginBtn) to ZENI ID
+ * (tài khoản hệ sinh thái Zeni — ZIPO-002, thay Supabase đã thu hồi).
+ * POST /api/auth/zeni/login → server đổi credential lấy JWT pair và set cookie.
  */
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { GoogleSignInButton } from '@/components/auth/google-button';
 
 type Props = {
   /** Pre-extracted `<div class="login">` HTML (full wrapper). */
@@ -62,12 +60,15 @@ export function LoginForm({ html }: Props) {
       setError(null);
       setPending(true);
       try {
-        const supabase = createClient();
-        const { error: authErr } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+        const res = await fetch('/api/auth/zeni/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
         });
-        if (authErr) throw authErr;
+        if (!res.ok) {
+          const j = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(j?.error ?? 'Đăng nhập thất bại');
+        }
         router.replace(redirect);
         router.refresh();
       } catch (err) {
@@ -88,9 +89,18 @@ export function LoginForm({ html }: Props) {
   return (
     <>
       <div ref={rootRef} dangerouslySetInnerHTML={{ __html: html }} />
-      <div style={{ maxWidth: 420, margin: '14px auto 0' }}>
-        <GoogleSignInButton />
-      </div>
+      <p
+        style={{
+          maxWidth: 420,
+          margin: '14px auto 0',
+          textAlign: 'center',
+          fontSize: '.78rem',
+          opacity: 0.75,
+        }}
+      >
+        Dùng tài khoản hệ sinh thái Zeni (Zeni ID). Chưa có tài khoản? Đăng ký tại
+        zenicloud.io — một tài khoản, mọi sản phẩm Zeni Holdings.
+      </p>
       {error && (
         <div
           style={{
