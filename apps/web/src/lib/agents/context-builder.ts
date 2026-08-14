@@ -1,7 +1,7 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ZeniClient } from '@/lib/zeni/compat'
 
 /**
- * Context builder — assembles the compact tenant snapshot a supagent needs
+ * Context builder Ã¢â‚¬â€ assembles the compact tenant snapshot a supagent needs
  * for one autonomous cycle. Every query is fault-tolerant: a missing table
  * or column degrades to an empty section instead of failing the run (the
  * engine runs across heterogeneous tenants + evolving schema).
@@ -34,7 +34,7 @@ async function safeRows(
 }
 
 export async function buildTenantSnapshot(
-  sb: SupabaseClient,
+  sb: ZeniClient,
   tenantId: string,
   agentCode: string,
 ): Promise<TenantSnapshot> {

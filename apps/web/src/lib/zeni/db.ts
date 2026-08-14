@@ -63,10 +63,33 @@ export async function withUser<T>(
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
+    // BẮT BUỘC đổi role: user kết nối là OWNER (bypass RLS). Chạy dưới
+    // `authenticated` (non-owner) thì RLS + policy `TO authenticated` mới áp.
+    // Quyền bảng cấp ở migration 030_runtime_roles_grants.sql. Fail-closed:
+    // SET ROLE lỗi → throw, không lặng lẽ chạy kiểu bypass.
+    await client.query('SET LOCAL ROLE authenticated');
     await client.query("SELECT set_config('app.uid', $1, true)", [uid]);
     if (opts?.superadmin) {
       await client.query("SELECT set_config('app.is_superadmin', 'on', true)");
     }
+    const out = await fn(client);
+    await client.query('COMMIT');
+    return out;
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/** Transaction ngữ cảnh KHÁCH VÃNG LAI (chưa đăng nhập): role anon, không app.uid.
+ *  RLS chặn mọi bảng trừ catalog public-read (005) — đúng hành vi Supabase cũ. */
+export async function withAnon<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL ROLE anon');
     const out = await fn(client);
     await client.query('COMMIT');
     return out;

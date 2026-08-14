@@ -1,13 +1,13 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ZeniClient } from '@/lib/zeni/compat'
 import type { PlanInput, PlanLine, Driver } from './engine'
 
 /**
- * Dựng PlanInput cho engine từ dữ liệu DB (plan_versions + plan_lines +
- * plan_assumptions + tax_rates). Fail-closed: thiếu dữ liệu → trả lỗi rõ ràng,
- * KHÔNG tự điền giá trị mặc định cho những thứ mang tính giả định kinh doanh.
+ * DÃ¡Â»Â±ng PlanInput cho engine tÃ¡Â»Â« dÃ¡Â»Â¯ liÃ¡Â»â€¡u DB (plan_versions + plan_lines +
+ * plan_assumptions + tax_rates). Fail-closed: thiÃ¡ÂºÂ¿u dÃ¡Â»Â¯ liÃ¡Â»â€¡u Ã¢â€ â€™ trÃ¡ÂºÂ£ lÃ¡Â»â€”i rÃƒÂµ rÃƒÂ ng,
+ * KHÃƒâ€NG tÃ¡Â»Â± Ã„â€˜iÃ¡Â»Ân giÃƒÂ¡ trÃ¡Â»â€¹ mÃ¡ÂºÂ·c Ã„â€˜Ã¡Â»â€¹nh cho nhÃ¡Â»Â¯ng thÃ¡Â»Â© mang tÃƒÂ­nh giÃ¡ÂºÂ£ Ã„â€˜Ã¡Â»â€¹nh kinh doanh.
  */
 export async function buildPlanInput(
-  supabase: SupabaseClient,
+  supabase: ZeniClient,
   versionId: string,
 ): Promise<{ ok: true; input: PlanInput } | { ok: false; error: string }> {
   const { data: version } = await supabase
@@ -15,7 +15,7 @@ export async function buildPlanInput(
     .select('id, horizon_months, start_period, status')
     .eq('id', versionId)
     .maybeSingle()
-  if (!version) return { ok: false, error: 'Không tìm thấy plan version' }
+  if (!version) return { ok: false, error: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y plan version' }
 
   const { data: lineRows } = await supabase
     .from('plan_lines')
@@ -24,7 +24,7 @@ export async function buildPlanInput(
   if (!lineRows || lineRows.length === 0) {
     return {
       ok: false,
-      error: 'Kế hoạch chưa có dòng nào — thêm dòng doanh thu/chi phí (bắt buộc gắn mã COA VAS).',
+      error: 'KÃ¡ÂºÂ¿ hoÃ¡ÂºÂ¡ch chÃ†Â°a cÃƒÂ³ dÃƒÂ²ng nÃƒÂ o Ã¢â‚¬â€ thÃƒÂªm dÃƒÂ²ng doanh thu/chi phÃƒÂ­ (bÃ¡ÂºÂ¯t buÃ¡Â»â„¢c gÃ¡ÂºÂ¯n mÃƒÂ£ COA VAS).',
     }
   }
 
@@ -42,7 +42,7 @@ export async function buildPlanInput(
     .eq('plan_version_id', versionId)
   const A = new Map<string, number>((assumRows ?? []).map((a) => [String(a.key), Number(a.value_base)]))
 
-  // Thuế suất theo hiệu lực — lấy từ bảng cấu hình (spec: không hardcode).
+  // ThuÃ¡ÂºÂ¿ suÃ¡ÂºÂ¥t theo hiÃ¡Â»â€¡u lÃ¡Â»Â±c Ã¢â‚¬â€ lÃ¡ÂºÂ¥y tÃ¡Â»Â« bÃ¡ÂºÂ£ng cÃ¡ÂºÂ¥u hÃƒÂ¬nh (spec: khÃƒÂ´ng hardcode).
   const { data: taxRows } = await supabase
     .from('tax_rates')
     .select('rate_pct, effective_from')

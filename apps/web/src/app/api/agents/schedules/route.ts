@@ -22,10 +22,30 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('agent_schedules')
-    .select('id, agent_code, cadence, autonomy, enabled, next_run_at, last_run_at, agent_catalog(name, department, is_chief)')
+    .select('id, agent_code, cadence, autonomy, enabled, next_run_at, last_run_at')
     .order('agent_code', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+  // Embed agent_catalog thủ công (compat client không hỗ trợ join PostgREST)
+  const rows = (data ?? []) as Array<Record<string, unknown>>
+  const codes = [...new Set(rows.map((s) => String(s.agent_code)))]
+  let catalogByCode: Record<string, unknown> = {}
+  if (codes.length > 0) {
+    const { data: cats } = await supabase
+      .from('agent_catalog')
+      .select('agent_code, name, department, is_chief')
+      .in('agent_code', codes)
+    catalogByCode = Object.fromEntries(
+      ((cats ?? []) as Array<Record<string, unknown>>).map((c) => [
+        String(c.agent_code),
+        { name: c.name, department: c.department, is_chief: c.is_chief },
+      ]),
+    )
+  }
+  const merged = rows.map((s) => ({
+    ...s,
+    agent_catalog: catalogByCode[String(s.agent_code)] ?? null,
+  }))
+  return NextResponse.json({ data: merged })
 }
 
 const PostSchema = z.object({

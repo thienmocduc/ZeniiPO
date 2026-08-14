@@ -45,7 +45,7 @@ export async function GET() {
         .limit(10),
       supabase
         .from('agent_runs')
-        .select('id, status, cost_usd, created_at, agents!inner(agent_code, name, tenant_id)')
+        .select('id, agent_id, status, cost_usd, created_at')
         .order('created_at', { ascending: false })
         .limit(10),
     ])
@@ -53,6 +53,23 @@ export async function GET() {
   // Catalog is the backbone — hard-fail only on it.
   if (catalog.error) {
     return NextResponse.json({ error: catalog.error.message }, { status: 500 })
+  }
+
+  // Embed agents thủ công (compat client không hỗ trợ join PostgREST !inner).
+  const runRows = (tolerateErr(recentRuns) ?? []) as Array<Record<string, unknown>>
+  let runsWithAgents: Array<Record<string, unknown>> = []
+  if (runRows.length > 0) {
+    const agentIds = [...new Set(runRows.map((r) => String(r.agent_id)))]
+    const { data: agentRows } = await supabase
+      .from('agents')
+      .select('id, agent_code, name, tenant_id')
+      .in('id', agentIds)
+    const byId = new Map(
+      ((agentRows ?? []) as Array<Record<string, unknown>>).map((a) => [String(a.id), a]),
+    )
+    runsWithAgents = runRows
+      .filter((r) => byId.has(String(r.agent_id))) // giữ ngữ nghĩa !inner
+      .map((r) => ({ ...r, agents: byId.get(String(r.agent_id)) }))
   }
 
   return NextResponse.json({
@@ -63,7 +80,7 @@ export async function GET() {
         schedules: tolerateErr(schedules),
         actions_pending: tolerateErr(pendingActions),
         actions_recent: tolerateErr(recentActions),
-        runs_recent: tolerateErr(recentRuns),
+        runs_recent: runsWithAgents,
       },
     },
   })

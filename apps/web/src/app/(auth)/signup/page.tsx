@@ -6,8 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Check, Loader2, X, Eye, EyeOff } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { GoogleSignInButton } from '@/components/auth/google-button';
+// Đăng ký = tạo TÀI KHOẢN HỆ SINH THÁI ZENI (Zeni ID) qua /api/auth/zeni/register.
 
 const passwordRules = {
   length: (v: string) => v.length >= 12,
@@ -102,25 +101,34 @@ export default function SignupPage() {
 
   async function onSubmit(values: FormValues) {
     setAuthError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email: values.email,
-      password: values.password,
-      options: {
-        data: {
+    try {
+      const res = await fetch('/api/auth/zeni/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
           full_name: values.full_name,
           company_name: values.company_name || null,
-          role: values.role,
-        },
-      },
-    });
-
-    if (error) {
-      setAuthError(error.message);
-      return;
+        }),
+      });
+      const out = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        logged_in?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !out.ok) {
+        setAuthError(out.error ?? 'Đăng ký thất bại — thử lại sau.');
+        return;
+      }
+      if (out.logged_in) {
+        window.location.href = '/dashboard';
+        return;
+      }
+      setSuccess(true);
+    } catch {
+      setAuthError('Không kết nối được máy chủ — thử lại sau.');
     }
-
-    setSuccess(true);
   }
 
   if (success) {
@@ -130,11 +138,11 @@ export default function SignupPage() {
           <Check size={28} />
         </div>
         <h1 className="font-display text-2xl text-ivory mb-2">
-          Email xác nhận <span className="italic text-gold-light">đã được gửi</span>
+          Tài khoản Zeni ID <span className="italic text-gold-light">đã được tạo</span>
         </h1>
         <p className="font-serif italic text-ink-2 mb-6">
-          Vui lòng kiểm tra hộp thư và nhấp vào liên kết xác nhận để kích hoạt
-          tài khoản Zeniipo của bạn.
+          Đây là tài khoản dùng chung toàn hệ sinh thái Zeni. Đăng nhập để bắt
+          đầu hành trình IPO của bạn.
         </p>
         <Link
           href="/login"
@@ -167,13 +175,7 @@ export default function SignupPage() {
         </div>
       )}
 
-      <GoogleSignInButton label="Đăng ký với Google" />
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-w8" />
-        <span className="font-mono text-2xs uppercase tracking-widest text-ink-dim">hoặc</span>
-        <div className="h-px flex-1 bg-w8" />
-      </div>
-
+      {/* Đăng nhập Google sẽ bật khi Zeni ID (Lớp 5) mở OAuth Google — quyết định 2026-08-11 */}
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <div>
           <label

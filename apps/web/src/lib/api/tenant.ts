@@ -1,11 +1,11 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ZeniClient } from '@/lib/zeni/compat'
 
 /**
  * Resolves the current user's tenant_id from user_profiles.
  * Returns null if not found.
  */
 export async function getCurrentTenantId(
-  supabase: SupabaseClient,
+  supabase: ZeniClient,
   userId: string,
 ): Promise<string | null> {
   const { data } = await supabase
@@ -17,14 +17,14 @@ export async function getCurrentTenantId(
 }
 
 type RequireResult =
-  | { ok: true; user: NonNullable<Awaited<ReturnType<SupabaseClient['auth']['getUser']>>['data']['user']>; tenantId: string }
+  | { ok: true; user: NonNullable<Awaited<ReturnType<ZeniClient['auth']['getUser']>>['data']['user']>; tenantId: string }
   | { ok: false; status: 401 | 403; message: string }
 
 /**
  * Returns the current authenticated user + their tenant_id, or a 401/403 response.
  * Use at the top of every authenticated API route to keep auth+tenant boilerplate small.
  */
-export async function requireUserAndTenant(supabase: SupabaseClient): Promise<RequireResult> {
+export async function requireUserAndTenant(supabase: ZeniClient): Promise<RequireResult> {
   const {
     data: { user },
   } = await supabase.auth.getUser()

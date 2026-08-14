@@ -15,9 +15,8 @@ export async function GET(req: NextRequest) {
     if (q && /^[\w\s-]+$/.test(q) && q.length <= 100) {
       // Basic safety: only allow alphanum + space + dash to prevent injection patterns
       const safe = q.replace(/[%_]/g, '\\$&')
-      query = query.or(
-        `term.ilike.%${safe}%,definition_vi.ilike.%${safe}%,definition_en.ilike.%${safe}%`,
-      )
+      // compat client: OR-string PostgREST → orIlikeAny (cùng ngữ nghĩa)
+      query = query.orIlikeAny(['term', 'definition_vi', 'definition_en'], `%${safe}%`)
     }
 
     const { data, error } = await query.order('term', { ascending: true }).limit(200)

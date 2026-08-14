@@ -1,15 +1,15 @@
 import { z } from 'zod'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ZeniClient } from '@/lib/zeni/compat'
 
 /**
- * Action executor — the ONLY path from agent output to database writes.
+ * Action executor Ã¢â‚¬â€ the ONLY path from agent output to database writes.
  *
  * Security model:
  *  - whitelisted action types only (CHECK constraint mirrors this list)
  *  - every payload zod-validated before touching a table
  *  - all writes carry tenant_id explicitly; callers pass an RLS-scoped SSR
  *    client (user approval path) or the service client (autonomy='auto'
- *    cron path) — both end up tenant-scoped because we set tenant_id here
+ *    cron path) Ã¢â‚¬â€ both end up tenant-scoped because we set tenant_id here
  *    and RLS/CHECKs re-verify on the user path.
  */
 
@@ -82,11 +82,11 @@ export function sanitizeAction(raw: unknown): ProposedAction | null {
 export type ExecutionResult = { ok: boolean; result?: Record<string, unknown>; error?: string }
 
 /**
- * Execute a validated action against tenant data. Never throws — returns
+ * Execute a validated action against tenant data. Never throws Ã¢â‚¬â€ returns
  * {ok:false,error} so callers can mark the agent_actions row 'failed'.
  */
 export async function executeAction(
-  sb: SupabaseClient,
+  sb: ZeniClient,
   tenantId: string,
   agentCode: string,
   action: ProposedAction,
@@ -103,7 +103,7 @@ export async function executeAction(
           .insert({
             tenant_id: tenantId,
             title: p.title,
-            description: p.description ?? `Đề xuất bởi supagent ${agentCode}`,
+            description: p.description ?? `Ã„ÂÃ¡Â»Â xuÃ¡ÂºÂ¥t bÃ¡Â»Å¸i supagent ${agentCode}`,
             priority: p.priority ?? 't2',
             status: 'todo',
             due_date: due,
@@ -117,7 +117,7 @@ export async function executeAction(
       }
       case 'upsert_kpi': {
         const p = UpsertKpiPayload.parse(action.payload)
-        // Append-only series (matches /api/kpis POST) — history preserved,
+        // Append-only series (matches /api/kpis POST) Ã¢â‚¬â€ history preserved,
         // dashboards read latest row per metric_code.
         const { data, error } = await sb
           .from('kpi_metrics')
@@ -135,7 +135,7 @@ export async function executeAction(
             tenant_id: tenantId,
             category: 'other',
             severity: p.severity,
-            title: `[AGENT·${agentCode}] ${p.title}`,
+            title: `[AGENTÃ‚Â·${agentCode}] ${p.title}`,
             body: p.body ?? null,
             page_path: 'agent-engine',
           })

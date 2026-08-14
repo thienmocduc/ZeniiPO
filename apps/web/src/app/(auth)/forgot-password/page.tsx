@@ -6,7 +6,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Check, Loader2, Mail } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 const schema = z.object({
   email: z.string().email('Email không hợp lệ'),
@@ -16,7 +15,7 @@ type FormValues = z.infer<typeof schema>;
 
 export default function ForgotPasswordPage() {
   const [authError, setAuthError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const [sent] = useState(false);
 
   const {
     register,
@@ -28,23 +27,12 @@ export default function ForgotPasswordPage() {
   });
 
   async function onSubmit(values: FormValues) {
-    setAuthError(null);
-    const supabase = createClient();
-    const origin =
-      typeof window !== 'undefined'
-        ? window.location.origin
-        : process.env.NEXT_PUBLIC_SITE_URL || '';
-
-    const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-      redirectTo: `${origin}/reset-password`,
-    });
-
-    if (error) {
-      setAuthError(error.message);
-      return;
-    }
-
-    setSent(true);
+    // Tài khoản là Zeni ID (hệ sinh thái) — đặt lại mật khẩu ở tầng nền tảng.
+    // App sẽ tự phục vụ khi Zeni ID mở API reset; hiện chỉ đường rõ ràng.
+    void values;
+    setAuthError(
+      'Mật khẩu thuộc tài khoản Zeni ID dùng chung hệ sinh thái. Vui lòng đặt lại tại zenicloud.io (Quên mật khẩu) rồi quay lại đăng nhập.',
+    );
   }
 
   if (sent) {
