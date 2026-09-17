@@ -98,8 +98,14 @@ export function LoginForm({ html }: Props) {
           opacity: 0.75,
         }}
       >
-        Dùng tài khoản hệ sinh thái Zeni (Zeni ID). Chưa có tài khoản? Đăng ký tại
-        zenicloud.io — một tài khoản, mọi sản phẩm Zeni Holdings.
+        Dùng tài khoản hệ sinh thái Zeni (Zeni ID) — một tài khoản, mọi sản phẩm
+        Zeni Holdings. Chưa có tài khoản?{' '}
+        {/* Trước đây đây là CHỮ THƯỜNG không bấm được, lại chỉ người dùng sang
+            nơi khác — trong khi /signup của chính app đã tạo được Zeni ID thật. */}
+        <a href="/signup" style={{ color: 'var(--gold-b)', textDecoration: 'none' }}>
+          Đăng ký ngay
+        </a>
+        .
       </p>
       {error && (
         <div

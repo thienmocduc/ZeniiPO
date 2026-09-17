@@ -228,12 +228,8 @@ export function getLoginHtml(): string {
     '',
   );
 
-  // 3. Chưa có đường sang trang đăng ký → thêm liên kết thật.
-  html = html.replace(
-    /(<button class="login-btn" id="loginBtn">[\s\S]*?<\/button>)/,
-    '$1<div style="margin-top:14px;text-align:center;font-size:.8rem;color:var(--ink-2)">' +
-      'Chưa có tài khoản? <a href="/signup" style="color:var(--gold-b);text-decoration:none">Đăng ký Zeni ID</a></div>',
-  );
+  // (Liên kết sang trang đăng ký nằm ở `app/(auth)/login/login-form.tsx` —
+  //  nút đăng nhập thật là component React, không phải nút tĩnh trong bản dựng.)
 
   return (_loginCache = html);
 }
