@@ -72,8 +72,23 @@ const PAGE_API_MAP: Record<string, string> = {
   'page-gvdoc': '/api/modules?category=governance',
   'page-tcdoc': '/api/modules?category=terms',
   'page-admin': '/api/admin',
-  'page-vault': '/api/vault',
   'page-settings': '/api/settings',
+}
+
+/**
+ * Trang CÓ trong bản dựng nhưng CHƯA có nguồn dữ liệu thật của riêng nó.
+ *
+ * Fail-closed (#7): nói thẳng "chưa có", tuyệt đối KHÔNG mượn tạm endpoint của
+ * tính năng khác chỉ vì trùng tên.
+ *
+ * `page-vault` (Két bí mật: API key, mật khẩu dịch vụ) từng trỏ chung
+ * `/api/vault` với `page-dataroom` (Data room: tài liệu thẩm định). Khi dữ liệu
+ * sống, binder sẽ bơm TÊN TÀI LIỆU vào đúng bảng đang hiển thị "Stripe Live API ·
+ * Anthropic API Key · Supabase Service Role" — vỡ hoàn toàn ý nghĩa tính năng.
+ * Hai thứ này là hai miền dữ liệu khác nhau; Két bí mật chưa có bảng/route riêng.
+ */
+const PAGES_NO_SOURCE: Record<string, string> = {
+  'page-vault': 'Két bí mật chưa có kho lưu trữ riêng — tính năng đang chờ xây dựng',
 }
 
 export function V1DataBind({ pageId, initialData, children }: DataBindProps) {
@@ -83,15 +98,32 @@ export function V1DataBind({ pageId, initialData, children }: DataBindProps) {
   useEffect(() => {
     if (initialData) return
     const url = PAGE_API_MAP[pageId]
-    if (!url) return
+    if (!url) {
+      // Trang chưa có nguồn dữ liệu riêng → nói thẳng, không để số minh hoạ đứng lại.
+      const reason = PAGES_NO_SOURCE[pageId]
+      if (reason) markUnmeasured(pageId, reason)
+      return
+    }
     let cancelled = false
     ;(async () => {
       try {
         const res = await fetch(url, { credentials: 'same-origin' })
-        if (!res.ok) return
+        if (!res.ok) {
+          // Fail-closed (#7): KHÔNG để số minh hoạ đứng lại như số thật.
+          if (!cancelled) {
+            markUnmeasured(
+              pageId,
+              res.status === 401
+                ? 'phiên đăng nhập đã hết, vui lòng đăng nhập lại'
+                : `nguồn dữ liệu chưa sẵn sàng (mã ${res.status})`,
+            )
+          }
+          return
+        }
         const json = await res.json()
         if (!cancelled) setData(json)
       } catch (err) {
+        if (!cancelled) markUnmeasured(pageId, 'chưa kết nối được nguồn dữ liệu')
         if (process.env.NODE_ENV !== 'production') console.error('[v1-data-bind]', pageId, err)
       }
     })()
@@ -109,10 +141,13 @@ export function V1DataBind({ pageId, initialData, children }: DataBindProps) {
       const r = patcher(data)
       if (r && typeof (r as Promise<void>).catch === 'function') {
         ;(r as Promise<void>).catch((err) => {
+          markUnmeasured(pageId, 'lỗi khi dựng số liệu lên màn hình')
           if (process.env.NODE_ENV !== 'production') console.error('[v1-data-bind] patch async', pageId, err)
         })
       }
     } catch (err) {
+      // Patcher vỡ giữa chừng = trang nửa thật nửa minh hoạ → nguy hiểm nhất.
+      markUnmeasured(pageId, 'lỗi khi dựng số liệu lên màn hình')
       if (process.env.NODE_ENV !== 'production') console.error('[v1-data-bind] patch', pageId, err)
     }
   }, [data, pageId])
@@ -153,6 +188,51 @@ function escapeHtml(s: string): string {
     '"': '&quot;',
     "'": '&#39;',
   }[c] as string))
+}
+
+/**
+ * RÀNG BUỘC #7 — FAIL-CLOSED (masterspec `docs/TICKETS_BRAIN_V1.md`).
+ *
+ * `source.html` là bản dựng tĩnh chứa số liệu MINH HOẠ của một công ty mẫu
+ * (doanh thu, định giá, cap table…). Trước đây khi nguồn dữ liệu lỗi, binder
+ * chỉ `return` im lặng → người dùng ngồi nhìn số của công ty khác và tưởng là
+ * số của mình. Đó là lỗi nguy hiểm hơn cả nút chết.
+ *
+ * Hàm này thay mọi số minh hoạ bằng "chưa đo được" + treo cảnh báo đầu trang.
+ * Thà trống còn hơn sai — nhất là với nền tảng tài chính.
+ */
+function markUnmeasured(pageId: string, reason: string): void {
+  if (typeof document === 'undefined') return
+  const root = document.getElementById(pageId)
+  if (!root || root.querySelector('[data-zeni-unmeasured]')) return
+
+  const banner = document.createElement('div')
+  banner.setAttribute('data-zeni-unmeasured', '1')
+  banner.style.cssText =
+    'margin:0 0 14px;padding:10px 14px;border:1px solid var(--warn,#d89b2c);' +
+    'border-left-width:3px;border-radius:6px;background:rgba(216,155,44,.08);' +
+    'color:var(--warn,#d89b2c);font-size:13px;line-height:1.55'
+  banner.textContent =
+    `⚠ Chưa đo được — ${reason}. Các số trên trang này là dữ liệu minh hoạ của ` +
+    'bản dựng, KHÔNG phải số liệu doanh nghiệp của bạn.'
+
+  const header = root.querySelector('.ph, .mhead')
+  if (header?.parentNode) header.parentNode.insertBefore(banner, header.nextSibling)
+  else root.insertBefore(banner, root.firstChild)
+
+  root.querySelectorAll<HTMLElement>('.kpi-v').forEach((el) => {
+    el.innerHTML = '<span style="opacity:.45">—</span>'
+  })
+  root.querySelectorAll<HTMLElement>('.kpi-chg, .kpi-sub').forEach((el) => {
+    el.textContent = 'chưa đo được'
+    el.className = el.className.replace(/\b(up|dn)\b/g, '')
+  })
+  root.querySelectorAll<HTMLTableSectionElement>('table.tbl tbody').forEach((tb) => {
+    const cols = tb.closest('table')?.querySelectorAll('thead th').length || 4
+    tb.innerHTML =
+      `<tr><td colspan="${cols}" style="text-align:center;color:var(--dim);` +
+      `font-style:italic;padding:18px">Chưa đo được — ${escapeHtml(reason)}</td></tr>`
+  })
 }
 
 /** Patch the 4 KPI cards in `.kpi-row` (in order). */
@@ -1098,8 +1178,9 @@ ${d.setup_hint ?? ''}`,
     patchKpiCards(root, [
       { value: String(members.length), label: 'Current FTE' },
       { value: String(openInvites), label: 'Open invites' },
-      { value: '0<em>%</em>', label: 'ESOP vested' },
-      { value: '0<em>%</em>', label: 'Attrition YTD' },
+      // #7: hai chỉ số này chưa có nguồn dữ liệu — KHÔNG bịa số 0 như thể đã đo.
+      { value: '—', label: 'ESOP đã trao quyền', sub: 'chưa đo được' },
+      { value: '—', label: 'Tỷ lệ nghỉ việc trong năm', sub: 'chưa đo được' },
     ])
     const cards = root.querySelectorAll<HTMLElement>('.col-2 .card')
     // Card 0: Hiring Pipeline → invitations
@@ -1390,8 +1471,9 @@ ${d.setup_hint ?? ''}`,
     patchKpiCards(root, [
       { value: String(decks.length), label: 'Decks uploaded' },
       { value: decks[0] ? fmtDate(decks[0].created_at) : '—', label: 'Latest version' },
-      { value: '0', label: 'Investor views' },
-      { value: '0', label: 'Avg time spent' },
+      // #7: chưa có cơ chế đo lượt xem deck — không bịa số 0.
+      { value: '—', label: 'Lượt nhà đầu tư xem', sub: 'chưa đo được' },
+      { value: '—', label: 'Thời gian xem trung bình', sub: 'chưa đo được' },
     ])
   },
 
@@ -1402,11 +1484,23 @@ ${d.setup_hint ?? ''}`,
     if (!root) return
     const d = (raw as { data?: { latest?: Record<string, { value: number; unit?: string }> } })?.data
     const latest = d?.latest ?? {}
+    // LỖI CŨ: chỉ set `value` theo thứ tự, không set `label` → giá trị bám vào
+    // nhãn tĩnh sai vị trí (tiền mặt nằm dưới nhãn "Runway", số tháng nằm dưới
+    // nhãn "Net burn"). Số THẬT mà SAI NHÃN còn nguy hiểm hơn số minh hoạ vì
+    // trông đáng tin. Nay luôn set label đi kèm value, và thiếu dữ liệu thì ghi
+    // "chưa đo được" theo ràng buộc #7 thay vì để dấu gạch mơ hồ.
+    const kpi = (
+      label: string,
+      m: { value: number } | undefined,
+      fmt: (n: number) => string,
+      sub: string,
+    ) => (m ? { value: fmt(m.value), label, sub } : { value: '—', label, sub: 'chưa đo được' })
+
     patchKpiCards(root, [
-      latest.monthly_burn ? { value: fmtMoney(latest.monthly_burn.value) } : { value: '—' },
-      latest.cash_balance ? { value: fmtMoney(latest.cash_balance.value) } : { value: '—' },
-      latest.runway_months ? { value: `${latest.runway_months.value}<em> mo</em>` } : { value: '—' },
-      latest.gross_burn ? { value: fmtMoney(latest.gross_burn.value) } : { value: '—' },
+      kpi('Đốt tiền ròng / tháng', latest.monthly_burn, fmtMoney, 'trung bình 3 tháng gần nhất'),
+      kpi('Số dư tiền', latest.cash_balance, fmtMoney, 'kỳ gần nhất'),
+      kpi('Số tháng sống', latest.runway_months, (n) => `${n}<em> tháng</em>`, 'theo mức đốt hiện tại'),
+      kpi('Đốt tiền gộp / tháng', latest.gross_burn, fmtMoney, 'chưa trừ doanh thu'),
     ])
   },
 
@@ -1530,10 +1624,12 @@ ${d.setup_hint ?? ''}`,
     if (!root) return
     const list = ((raw as { data?: Array<{ id: string; name?: string; title?: string; description?: string }> })?.data) ?? []
     patchKpiCards(root, [
-      { value: String(list.length), label: 'Modules' },
-      { value: '10', label: 'Phases' },
-      { value: '40', label: 'Sections' },
-      { value: '✅', label: 'Live' },
+      // Chỉ số duy nhất đo được từ dữ liệu thật là số module trả về.
+      // 3 số còn lại trước đây cắm cứng ('10', '40', '✅') như thể đã đo — bỏ (#7).
+      { value: String(list.length), label: 'Số module' },
+      { value: '—', label: 'Giai đoạn', sub: 'chưa đo được' },
+      { value: '—', label: 'Mục nội dung', sub: 'chưa đo được' },
+      { value: '—', label: 'Trạng thái', sub: 'chưa đo được' },
     ])
   },
 
@@ -2177,21 +2273,7 @@ ${d.setup_hint ?? ''}`,
     ])
   },
 
-  'page-vault': (raw) => {
-    const root = document.getElementById('page-vault')
-    if (!root) return
-    const d = (raw as { data?: { folders?: unknown[]; docs?: Array<{ id: string; title: string; mime_type?: string; file_size_bytes?: number; created_at: string }> } })?.data
-    const folders = d?.folders ?? []
-    const docs = d?.docs ?? []
-    patchKpiCards(root, [
-      { value: String(docs.length), label: 'Total assets' },
-      { value: String(folders.length), label: 'Folders' },
-      { value: `${(docs.reduce((a, d) => a + (d.file_size_bytes ?? 0), 0) / 1_000_000).toFixed(1)}<em>MB</em>`, label: 'Storage' },
-      { value: docs[0] ? fmtDate(docs[0].created_at) : '—', label: 'Latest upload' },
-    ])
-    const rows = docs.slice(0, 30).map((d) => `<tr><td><strong>${escapeHtml(d.title)}</strong></td><td>${escapeHtml(d.mime_type ?? '—')}</td><td class="num">${((d.file_size_bytes ?? 0) / 1024).toFixed(0)} KB</td><td>${fmtDate(d.created_at)}</td></tr>`)
-    patchTable(root, '.card', rows, 'Vault trống. Upload tài liệu đầu tiên.', 4)
-  },
+  // 'page-vault' (Két bí mật) đã chuyển sang PAGES_NO_SOURCE — xem chú thích ở đó.
 
   'page-settings': (raw) => {
     const root = document.getElementById('page-settings')
