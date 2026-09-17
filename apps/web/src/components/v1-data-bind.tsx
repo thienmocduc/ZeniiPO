@@ -261,8 +261,17 @@ function patchTable(
   emptyMessage: string,
   colCount = 4,
 ) {
-  const card = root.querySelector<HTMLElement>(cardSel) ?? root
-  const tbody = card.querySelector<HTMLTableSectionElement>('table.tbl tbody')
+  // LỖI CŨ: `querySelector(cardSel)` lấy thẻ ĐẦU TIÊN khớp. Ở nhiều trang
+  // (legal, mktdata, schema…) thẻ đầu tiên là card giới thiệu KHÔNG chứa bảng,
+  // còn bảng số liệu thật nằm ở card thứ 2-4. Hệ quả: hàm return sớm, dữ liệu
+  // thật bị huỷ âm thầm và bảng minh hoạ đứng vĩnh viễn — kể cả khi nguồn sống.
+  // Nay: quét mọi thẻ khớp, lấy thẻ ĐẦU TIÊN CÓ BẢNG.
+  let tbody: HTMLTableSectionElement | null = null
+  for (const c of Array.from(root.querySelectorAll<HTMLElement>(cardSel))) {
+    const t = c.querySelector<HTMLTableSectionElement>('table.tbl tbody')
+    if (t) { tbody = t; break }
+  }
+  if (!tbody) tbody = (root as ParentNode).querySelector<HTMLTableSectionElement>('table.tbl tbody')
   if (!tbody) return
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--dim);font-style:italic;padding:18px">${escapeHtml(emptyMessage)}</td></tr>`

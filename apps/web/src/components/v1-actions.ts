@@ -200,9 +200,15 @@ export function ensureHeaderButton(
     btn.id = id
     btn.className = 'btn btn-pri'
     btn.textContent = label
+    // Bản dựng có HAI kiểu khung tiêu đề: `.ph/.ph-r` (trang đời đầu) và
+    // `.mhead/.mhead-r` (nhóm trang làm sau). Trước đây chỉ tìm `.ph-r`/`.ph`
+    // nên ở 7 trang dùng khung mới (token, plv, mktdata, mktintel, nlq, sales,
+    // fclb) nút bị rơi xuống CUỐI TRANG, người dùng không thấy đâu mà bấm.
     const host =
       (root as HTMLElement).querySelector('.ph-r') ??
+      (root as HTMLElement).querySelector('.mhead-r') ??
       (root as HTMLElement).querySelector('.ph') ??
+      (root as HTMLElement).querySelector('.mhead') ??
       (root as HTMLElement)
     host.appendChild(btn)
   }

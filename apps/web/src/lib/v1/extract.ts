@@ -209,6 +209,32 @@ export function getLoginHtml(): string {
   // the demo seed so the form opens blank like a real login screen.
   html = html.replace(/(<input[^>]*\bid="loginEmail"[^>]*?)\s+value="[^"]*"/, '$1');
   html = html.replace(/(<input[^>]*\bid="loginPassword"[^>]*?)\s+value="[^"]*"/, '$1');
+
+  // ── Vá 3 chỗ chết trên màn hình đăng nhập (kiểm kê 18/09/2026) ──
+  // `stripInlineHandlers` ở trên đã gỡ mọi `onclick` demo, nên các nút dưới đây
+  // trở thành nút bấm-không-phản-ứng. Người dùng thật gặp ngõ cụt ngay cửa vào.
+
+  // 1. "Quên mật khẩu?" đang trỏ href="#" → trỏ về trang thật.
+  html = html.replace(
+    /<a href="#"([^>]*)>Quên mật khẩu\?<\/a>/,
+    '<a href="/forgot-password"$1>Quên mật khẩu?</a>',
+  );
+
+  // 2. Nút "Đăng nhập bằng Google / Microsoft SSO": Zeni ID hiện CHƯA mở OAuth
+  //    (đã dò: /auth/google, /auth/oauth/google, /auth/providers đều 404).
+  //    Gỡ hẳn nút còn hơn để người dùng bấm vào chỗ không dẫn đi đâu.
+  html = html.replace(
+    /<button class="login-btn"[^>]*>[\s\S]*?Đăng nhập bằng Google \/ Microsoft SSO[\s\S]*?<\/button>/,
+    '',
+  );
+
+  // 3. Chưa có đường sang trang đăng ký → thêm liên kết thật.
+  html = html.replace(
+    /(<button class="login-btn" id="loginBtn">[\s\S]*?<\/button>)/,
+    '$1<div style="margin-top:14px;text-align:center;font-size:.8rem;color:var(--ink-2)">' +
+      'Chưa có tài khoản? <a href="/signup" style="color:var(--gold-b);text-decoration:none">Đăng ký Zeni ID</a></div>',
+  );
+
   return (_loginCache = html);
 }
 

@@ -54,18 +54,42 @@ export function toNumber(v: unknown): number | undefined {
 }
 
 /** Chuẩn hoá ngày: 2026-06 · 2026-06-15 · 15/06/2026 · 06/2026 → YYYY-MM-01 (tháng) */
+/**
+ * Ngày/tháng có TỒN TẠI THẬT không.
+ *
+ * Trước đây các hàm dưới chỉ khớp hình dạng chuỗi rồi ghép lại, nên
+ * `toDate('32/13/2026')` cho ra `'2026-13-32'` — tháng 13, ngày 32 — và ghi
+ * thẳng xuống database. Fail-closed (#7): dữ liệu vô lý phải bị TỪ CHỐI,
+ * không được đoán cũng không được cho lọt.
+ */
+function isRealDate(y: number, mo: number, d: number): boolean {
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return false
+  const dt = new Date(Date.UTC(y, mo - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d
+}
+
+function isRealMonth(y: number, mo: number): boolean {
+  return Number.isInteger(y) && y >= 1900 && y <= 2999 && mo >= 1 && mo <= 12
+}
+
+const pad2 = (n: string | number) => String(n).padStart(2, '0')
+
 export function toMonthDate(v: unknown): string | undefined {
   if (v == null || v === '') return undefined
   const s = String(v).trim()
+  const build = (y: string, mo: string) =>
+    isRealMonth(Number(y), Number(mo)) ? `${y}-${pad2(mo)}-01` : undefined
+
   let m = /^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/.exec(s)
-  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-01`
+  if (m) return build(m[1], m[2])
   m = /^(\d{1,2})\/(\d{4})$/.exec(s)
-  if (m) return `${m[2]}-${m[1].padStart(2, '0')}-01`
+  if (m) return build(m[2], m[1])
   m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s)
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-01`
+  if (m) return build(m[3], m[2])
+
   const d = new Date(s)
   if (!Number.isNaN(d.getTime())) {
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
+    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-01`
   }
   return undefined
 }
@@ -73,10 +97,15 @@ export function toMonthDate(v: unknown): string | undefined {
 export function toDate(v: unknown): string | undefined {
   if (v == null || v === '') return undefined
   const s = String(v).trim()
+  const build = (y: string, mo: string, day: string) =>
+    isRealDate(Number(y), Number(mo), Number(day)) ? `${y}-${pad2(mo)}-${pad2(day)}` : undefined
+
   let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s)
-  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+  if (m) return build(m[1], m[2], m[3])
+  // Định dạng Việt Nam: ngày/tháng/năm
   m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s)
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+  if (m) return build(m[3], m[2], m[1])
+
   const d = new Date(s)
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString().slice(0, 10)
 }

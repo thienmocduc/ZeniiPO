@@ -6,6 +6,7 @@ import { Topbar } from '@/components/topbar';
 import { V1Modals } from '@/components/v1-modals';
 import { V1Interactivity } from '@/components/v1-interactivity';
 import { IdentityBind } from '@/components/identity-bind';
+import { AccountMenu } from '@/components/account-menu';
 import {
   getSidebarInner,
   rewriteSidebarForNextLinks,
@@ -57,6 +58,8 @@ export default async function AppLayout({
       <V1Interactivity script={script} />
       {/* Patch topbar identity chips with the real logged-in user + tenant */}
       <IdentityBind />
+      {/* Nút đăng xuất — trước đây toàn hệ không có đường thoát phiên */}
+      <AccountMenu email={user.email} />
     </>
   );
 }
