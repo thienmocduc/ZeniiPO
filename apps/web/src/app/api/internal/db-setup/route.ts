@@ -67,11 +67,25 @@ function findMigrationsDir(): string | null {
   return null;
 }
 
+/**
+ * Thứ tự chạy migration là BẮT BUỘC, và sắp xếp theo bảng chữ cái là SAI.
+ *
+ * So chuỗi: "001_auth_rbac.sql" < "00_zeni_stub.sql" vì ký tự '1' đứng trước '_'
+ * trong bảng mã. Hậu quả thật (đo được khi chạy lần đầu trên DB trống): file 001
+ * chạy trước và chết ngay với `schema "auth" does not exist`, kéo theo 30 file
+ * sau bị bỏ qua — 31/31 thất bại.
+ *
+ * Nay sắp theo SỐ ở đầu tên file: 00_zeni_stub (0) → 001 (1) → … → 030 (30).
+ */
 function listSqlFiles(dir: string): string[] {
+  const order = (f: string): number => {
+    const m = /^(\d+)/.exec(f)
+    return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER
+  }
   return fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.sql'))
-    .sort(); // 00_zeni_stub → 001 → … → 028 (thứ tự tên file là thứ tự bắt buộc)
+    .sort((a, b) => order(a) - order(b) || a.localeCompare(b))
 }
 
 async function sanityCounts() {

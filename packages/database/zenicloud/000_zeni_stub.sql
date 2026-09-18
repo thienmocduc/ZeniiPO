@@ -2,6 +2,13 @@
 -- 00_zeni_stub.sql · Zeni Cloud Postgres foundation stub for ZeniIPO
 -- ZIPO-001 — Supabase -> Zeni Cloud Postgres conversion
 -- ═══════════════════════════════════════════════════════════════════
+-- ⚠ TÊN TỆP PHẢI GIỮ BA SỐ "000" — ĐỪNG ĐỔI VỀ "00_" (bài học 18/09/2026).
+-- Bộ chạy migration sắp tệp theo thứ tự chữ cái. Trong bảng mã, dấu gạch dưới "_" (0x5F)
+-- lớn hơn mọi chữ số, nên "00_zeni_stub.sql" xếp SAU "001_auth_rbac.sql" — tệp tạo schema
+-- `auth` chạy sau chính tệp cần nó. Kết quả thật khi dựng lại trên Zeni Cloud: 001 đổ ngay
+-- với "schema \"auth\" does not exist", kéo theo cả 31 tệp cùng hỏng.
+-- "000_" xếp trước "001_" nên chạy đúng thứ tự.
+--
 -- Runs BEFORE 001..028. Provides the pieces Supabase's platform used to
 -- supply automatically (auth schema/functions, roles, extensions) so the
 -- 28 business migrations below can run UNCHANGED in business logic.
