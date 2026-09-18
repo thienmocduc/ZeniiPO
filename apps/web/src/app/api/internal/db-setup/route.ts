@@ -88,6 +88,47 @@ function listSqlFiles(dir: string): string[] {
     .sort((a, b) => order(a) - order(b) || a.localeCompare(b))
 }
 
+/**
+ * Chẩn đoán quyền trên DB đích.
+ *
+ * Khi dựng thật trên Zeni Cloud, `000_zeni_stub.sql` đổ với
+ * "permission denied to create role" — nhưng thông báo đó không cho biết ta
+ * ĐANG là ai và THIẾU đúng quyền nào. Hàm này trả lời chính xác để còn đi xin
+ * đúng thứ cần, thay vì đoán.
+ */
+async function dbDiagnostics() {
+  const { query } = await import('@/lib/zeni/db')
+  const out: Record<string, unknown> = {}
+  const probe = async (key: string, sql: string) => {
+    try {
+      const r = await query<Record<string, unknown>>(sql)
+      out[key] = r[0] ?? null
+    } catch (e) {
+      out[key] = `ERR: ${e instanceof Error ? e.message.slice(0, 120) : 'unknown'}`
+    }
+  }
+  await probe('me', 'SELECT current_user, current_database() AS db, version() AS pg')
+  await probe(
+    'quyen_cua_toi',
+    `SELECT rolsuper AS la_superuser, rolcreaterole AS tao_duoc_role,
+            rolcreatedb AS tao_duoc_db, rolbypassrls AS bo_qua_rls
+       FROM pg_roles WHERE rolname = current_user`,
+  )
+  await probe(
+    'role_can_co',
+    `SELECT
+       bool_or(rolname='authenticated') AS co_authenticated,
+       bool_or(rolname='anon')          AS co_anon,
+       bool_or(rolname='service_role')  AS co_service_role
+     FROM pg_roles`,
+  )
+  await probe(
+    'schema_auth',
+    `SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name='auth') AS co_schema_auth`,
+  )
+  return out
+}
+
 async function sanityCounts() {
   const { query } = await import('@/lib/zeni/db');
   const out: Record<string, number | string> = {};
@@ -116,7 +157,12 @@ export async function GET(req: NextRequest) {
       const r = await query<{ n: number }>(
         "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public'",
       );
-      db = { connected: true, public_tables: r[0]?.n ?? 0, sanity: await sanityCounts() };
+      db = {
+        connected: true,
+        public_tables: r[0]?.n ?? 0,
+        sanity: await sanityCounts(),
+        chan_doan: await dbDiagnostics(),
+      };
     } catch (e) {
       db = { connected: false, error: e instanceof Error ? e.message.slice(0, 160) : 'unknown' };
     }
