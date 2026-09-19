@@ -191,10 +191,21 @@ export function getTopbarHtml(): string {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Login — `<div class="login" id="login"> … </div>` (full element including wrapper)
+// ⛔ KHÔNG DÙNG NỮA — getLoginHtml (giữ tạm, sẽ xoá)
+//
+// Hàm này lấy khối `<div class="login">` của BẢN DỰNG DEMO rồi gọt bằng biểu
+// thức tìm-thay. Ngày 19/09/2026 cách đó đã cắt nhầm **chính nút Đăng nhập**
+// trên bản chạy thật (nút thật và nút SSO demo cùng tên lớp, nút thật đứng
+// trước) ⇒ cửa vào sản phẩm không còn nút nào để bấm.
+//
+// Màn hình đăng nhập nay viết bằng React tại `app/(auth)/login/login-form.tsx`:
+// muốn bỏ gì thì không render, gõ Enter cũng gửi được, kiểm thử được.
+//
+// KHÔNG gọi lại hàm này. KHÔNG thêm bước gọt mới vào đây.
 // ─────────────────────────────────────────────────────────────
 let _loginCache: string | null = null;
 
+/** @deprecated Không còn được dùng — xem ghi chú ở trên. Sẽ xoá. */
 export function getLoginHtml(): string {
   if (_loginCache != null) return _loginCache;
   const src = loadSource();
@@ -223,9 +234,61 @@ export function getLoginHtml(): string {
   // 2. Nút "Đăng nhập bằng Google / Microsoft SSO": Zeni ID hiện CHƯA mở OAuth
   //    (đã dò: /auth/google, /auth/oauth/google, /auth/providers đều 404).
   //    Gỡ hẳn nút còn hơn để người dùng bấm vào chỗ không dẫn đi đâu.
+  //    ⚠ BÀI HỌC 19/09/2026 — regex cũ viết `<button class="login-btn"[^>]*>`
+  //    rồi quét lười tới chữ "SSO". Nhưng NÚT ĐĂNG NHẬP THẬT (`id="loginBtn"`)
+  //    cũng mang `class="login-btn"` và ĐỨNG TRƯỚC nút SSO ⇒ khớp từ nút đăng
+  //    nhập, nuốt luôn cả nó. Kết quả trên bản chạy thật: màn hình đăng nhập
+  //    KHÔNG CÒN NÚT NÀO để bấm. Nay neo vào `style="background:var(--w4)` —
+  //    dấu hiệu CHỈ nút SSO mới có.
   html = html.replace(
-    /<button class="login-btn"[^>]*>[\s\S]*?Đăng nhập bằng Google \/ Microsoft SSO[\s\S]*?<\/button>/,
+    /<button class="login-btn" style="background:var\(--w4\)[\s\S]*?<\/button>/,
     '',
+  );
+  // …và gỡ luôn dải phân cách "HOẶC" của nút đó, không để đứng trơ một mình.
+  html = html.replace(
+    /<div style="display:flex;align-items:center;gap:12px;margin:14px 0 10px">[\s\S]*?HOẶC[\s\S]*?<\/div>\s*<\/div>/,
+    '',
+  );
+
+  // ── Dọn tàn dư BẢN DỰNG DEMO trên màn hình đăng nhập thật ──
+  // Ba thứ dưới đây khiến người dùng hiểu sai hoàn toàn cách đăng nhập.
+
+  // 2a. Ô "Công ty": bản dựng cho chọn trong 8 công ty mẫu. Đăng nhập thật KHÔNG
+  //     dùng ô này — tổ chức lấy từ hồ sơ người dùng trong dữ liệu. Để lại thì
+  //     người dùng tưởng chọn sai công ty là không vào được.
+  html = html.replace(
+    /<label class="login-label">Công ty[\s\S]*?<\/select>/,
+    '',
+  );
+
+  // 2b. Bộ chọn "Vai trò" (CHR-001 · CEO-001 · …): cũng của bản dựng. Vai trò
+  //     thật do dữ liệu quyết định, bấm ở đây không đổi được quyền gì — để lại
+  //     là hứa hão, tệ hơn nữa là gợi ý người dùng tự nhận quyền Chairman.
+  //     Neo vào mốc CHẮC CHẮN đứng ngay sau khối vai trò (hàng "Giữ đăng nhập /
+  //     Quên mật khẩu") thay vì đếm thẻ đóng — khối này có 8 ô lồng nhau, đếm
+  //     `</div>` kiểu lười sẽ cắt sót 7 ô, để lại giao diện vỡ.
+  html = html.replace(
+    /<label class="login-label">Vai trò[\s\S]*?(?=<div style="display:flex;justify-content:space-between)/,
+    '',
+  );
+
+  // 2c. Dòng "DEMO credentials: mọi field đều có default value…" — SAI SỰ THẬT
+  //     trên bản chạy thật (không còn giá trị mặc định nào). Thay bằng câu nói
+  //     đúng: đây là đăng nhập bằng tài khoản Zeni ID dùng chung hệ sinh thái.
+  html = html.replace(
+    /<div class="login-hint"[^>]*>[\s\S]*?DEMO credentials:[\s\S]*?<\/div>/,
+    '<div class="login-hint" style="margin-top:14px">' +
+      'Đăng nhập bằng <b style="color:var(--gold-b)">tài khoản Zeni ID</b> — một tài khoản dùng chung ' +
+      'cho mọi sản phẩm Zeni Holdings (zenicloud.io · ZeniIPO · Zeni Digital).<br/>' +
+      'Tổ chức và vai trò của bạn được lấy tự động từ hồ sơ, không cần chọn ở đây.' +
+      '</div>',
+  );
+
+  // 2d. Câu phụ đề cũ nói về "tenant/RLS policy cấp row" — ngôn ngữ kỹ thuật nội
+  //     bộ, người dùng thật không hiểu. Nói đúng việc họ cần làm.
+  html = html.replace(
+    /<p class="login-sub">[\s\S]*?<\/p>/,
+    '<p class="login-sub">Dùng tài khoản Zeni ID của bạn. Dữ liệu mỗi tổ chức tách biệt hoàn toàn.</p>',
   );
 
   // (Liên kết sang trang đăng ký nằm ở `app/(auth)/login/login-form.tsx` —

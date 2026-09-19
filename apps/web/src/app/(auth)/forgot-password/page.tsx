@@ -15,7 +15,9 @@ type FormValues = z.infer<typeof schema>;
 
 export default function ForgotPasswordPage() {
   const [authError, setAuthError] = useState<string | null>(null);
-  const [sent] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sentMsg, setSentMsg] = useState<string>('');
+  const [resetUrl, setResetUrl] = useState<string | null>(null);
 
   const {
     register,
@@ -26,13 +28,36 @@ export default function ForgotPasswordPage() {
     defaultValues: { email: '' },
   });
 
+  /**
+   * Trước đây hàm này KHÔNG gửi gì, chỉ hiện một dòng chữ — người dùng bấm xong
+   * ngồi chờ mail vĩnh viễn. Nay gọi thật sang Zeni ID; nền tảng chưa mở đường
+   * thì nói thẳng là chưa gửi được và đưa chỗ tự xử, chứ không báo "đã gửi".
+   */
   async function onSubmit(values: FormValues) {
-    // Tài khoản là Zeni ID (hệ sinh thái) — đặt lại mật khẩu ở tầng nền tảng.
-    // App sẽ tự phục vụ khi Zeni ID mở API reset; hiện chỉ đường rõ ràng.
-    void values;
-    setAuthError(
-      'Mật khẩu thuộc tài khoản Zeni ID dùng chung hệ sinh thái. Vui lòng đặt lại tại zenicloud.io (Quên mật khẩu) rồi quay lại đăng nhập.',
-    );
+    setAuthError(null);
+    setResetUrl(null);
+    try {
+      const res = await fetch('/api/auth/zeni/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: values.email }),
+      });
+      const out = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+        reset_url?: string;
+      };
+      if (res.ok && out.ok) {
+        setSentMsg(out.message ?? 'Đã gửi liên kết đặt lại. Kiểm tra cả hộp thư rác.');
+        setSent(true);
+        return;
+      }
+      setAuthError(out.error ?? 'Chưa gửi được liên kết đặt lại. Vui lòng thử lại sau.');
+      if (out.reset_url) setResetUrl(out.reset_url);
+    } catch {
+      setAuthError('Không kết nối được máy chủ. Vui lòng thử lại sau.');
+    }
   }
 
   if (sent) {
@@ -42,11 +67,9 @@ export default function ForgotPasswordPage() {
           <Check size={28} />
         </div>
         <h1 className="font-display text-2xl text-ivory mb-2">
-          Email reset <span className="italic text-gold-light">đã được gửi</span>
+          Liên kết đặt lại <span className="italic text-gold-light">đã được gửi</span>
         </h1>
-        <p className="font-serif italic text-ink-2 mb-6">
-          Vui lòng kiểm tra hộp thư và nhấp vào liên kết để đặt lại mật khẩu.
-        </p>
+        <p className="font-serif italic text-ink-2 mb-6">{sentMsg}</p>
         <Link
           href="/login"
           className="inline-block bg-gold text-bg px-8 py-3 rounded font-semibold hover:bg-gold-light transition"
@@ -77,6 +100,17 @@ export default function ForgotPasswordPage() {
           className="mb-5 rounded border border-err/40 bg-err/10 px-4 py-3 text-sm text-err"
         >
           {authError}
+          {/* Chưa gửi được thì phải đưa NGAY chỗ tự xử, đừng để người dùng bí. */}
+          {resetUrl && (
+            <a
+              href={resetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 block font-semibold text-gold-light underline underline-offset-4"
+            >
+              Mở Zeni ID để đặt lại mật khẩu →
+            </a>
+          )}
         </div>
       )}
 

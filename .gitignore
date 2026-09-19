@@ -28,6 +28,13 @@ test-results/
 .env.development.local
 .env.test.local
 .env.production.local
+# Biến công khai cần inline lúc build, dựng lại từ secrets khi deploy (xem
+# ci.yml). Trước đây KHÔNG được chặn ở đây — chỉ cần một lần `git add -A` là
+# lọt lên kho công khai.
+.env.production
+
+# gói mã nguồn tạm do scripts/deploy-zenicloud.mjs sinh ra (có kèm .env.production)
+zeniipo-src.zip
 
 # logs
 *.log
