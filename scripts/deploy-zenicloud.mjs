@@ -3,15 +3,36 @@
  * Builds from the public GitHub repo using the repo-root Dockerfile.
  * Reads token + env from .env.local. Run: node scripts/deploy-zenicloud.mjs
  */
-import dotenv from 'dotenv'
 import fs from 'node:fs'
 import path from 'node:path'
 import { execSync } from 'node:child_process'
-dotenv.config({ path: '.env.local' })
+
+// `.env.local` chỉ có trên máy lập trình viên. Trên CI biến đến từ secrets của
+// kho và job deploy KHÔNG cài node_modules — nên `dotenv` phải là TUỲ CHỌN.
+// Trước đây nó là `import` cứng ở đầu tệp: thiếu gói là hỏng ngay dòng đầu,
+// chưa kịp chạy gì (lần chạy 19/09 chết đúng kiểu này sau 10 giây).
+try {
+  const { default: dotenv } = await import('dotenv')
+  dotenv.config({ path: '.env.local' })
+} catch {
+  // Không có dotenv → đọc thẳng process.env. Bình thường trên CI.
+}
 
 const API = process.env.ZENICLOUD_API
 const WS = process.env.ZENICLOUD_WS
 const TOK = process.env.ZENICLOUD_API_TOKEN
+
+// Fail-closed: thiếu biến thì dừng với thông báo rõ, đừng gửi request tới
+// `undefined/deploy/quick` rồi báo một lỗi mạng khó hiểu.
+const thieu = Object.entries({ ZENICLOUD_API: API, ZENICLOUD_WS: WS, ZENICLOUD_API_TOKEN: TOK })
+  .filter(([, v]) => !v)
+  .map(([k]) => k)
+if (thieu.length) {
+  console.error(`⛔ Thiếu biến môi trường: ${thieu.join(', ')}`)
+  console.error('   Máy cá nhân: khai trong .env.local · CI: khai ở Settings → Secrets của kho.')
+  process.exit(1)
+}
+
 const hdr = { Authorization: `Bearer ${TOK}`, 'Content-Type': 'application/json' }
 
 // Env vars the app needs to boot (Supabase backend kept for now).
