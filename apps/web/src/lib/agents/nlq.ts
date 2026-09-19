@@ -1,4 +1,4 @@
-import { getAnthropicClient, FAST_MODEL } from './client'
+import { FAST_MODEL, chatComplete } from './client'
 
 /**
  * Natural-language query → safe Supabase intent.
@@ -90,22 +90,18 @@ function approxCost(model: string, inputTokens: number, outputTokens: number): n
 }
 
 export async function parseNlqQuery(question: string): Promise<NlqResult> {
-  const client = getAnthropicClient()
   const model = FAST_MODEL
-  const res = await client.messages.create({
-    model,
-    max_tokens: 800,
+  const res = await chatComplete({
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: question }],
+    user: question,
+    model,
+    maxTokens: 800,
+    temperature: 0,
   })
-  const text = res.content
-    .filter((b) => b.type === 'text')
-    .map((b) => (b as { type: 'text'; text: string }).text)
-    .join('')
-    .trim()
+  const text = res.text.trim()
 
-  const tokens_input = res.usage?.input_tokens ?? 0
-  const tokens_output = res.usage?.output_tokens ?? 0
+  const tokens_input = res.inputTokens
+  const tokens_output = res.outputTokens
   const cost_usd = approxCost(model, tokens_input, tokens_output)
   const meta = { model, tokens_input, tokens_output, cost_usd }
 

@@ -34,7 +34,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://zeniipo.com'),
+  metadataBase: new URL('https://zenicloud.io'),
   title: 'Zeniipo · IPO Journey Platform · Từ Day-0 đến ring-bell SGX 2031',
   description:
     'Nền tảng điều hành IPO dành cho founder Việt Nam và Đông Nam Á. Cascade tư tưởng từ Chairman xuống 12 tầng, 108 AI agent, 44 module, 420 bước — đi thẳng từ Day-0 đến ring-bell SGX 2031.',
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     title: 'Zeniipo · IPO Journey Platform',
     description:
       'Từ Day-0 tư tưởng đến ring-bell SGX 2031 — 10 phase, 44 module, 108 agent, 420 step.',
-    url: 'https://zeniipo.com',
+    url: 'https://zenicloud.io',
     siteName: 'Zeniipo',
     locale: 'vi_VN',
     type: 'website',

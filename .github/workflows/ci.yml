@@ -1,10 +1,27 @@
 name: CI
+
+# GIT TRƯỚC, DEPLOY SAU.
+#
+# Trước đây file này chỉ chạy trên `main`, trong khi mọi công việc thật nằm ở
+# nhánh `feat/**` — nghĩa là hàng chục commit đã đẩy lên mà KHÔNG máy nào kiểm.
+# Nó cũng không chạy test (lúc đó bộ test đang hỏng, chạy là đỏ) và vẫn khai
+# biến Supabase đã bị thu hồi.
 on:
-  push: { branches: [main] }
-  pull_request: { branches: [main] }
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+  # Cho phép bấm tay để deploy từ bất kỳ nhánh nào (dùng khi chưa merge về main).
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy lên Zeni Cloud sau khi kiểm xong?'
+        type: boolean
+        default: false
 
 jobs:
-  build-test:
+  kiem-tra:
+    name: Kiểm tra (kiểu · test · build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,14 +30,24 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20', cache: 'pnpm' }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run typecheck
-      - run: pnpm turbo run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-  security-scan:
+      - name: Kiểm kiểu dữ liệu
+        run: pnpm -C apps/web exec tsc --noEmit
+
+      # Bộ test số cứng cho engine tài chính, định giá, đọc số liệu Việt Nam,
+      # và các test canh màn hình đăng nhập. KHÔNG cần database.
+      - name: Chạy test
+        run: pnpm -C apps/web exec vitest run
+
+      - name: Build
+        run: pnpm -C apps/web build
+        env:
+          # Biến công khai cần inline lúc build cho middleware.
+          # (Supabase đã bị thu hồi — không khai lại ở đây nữa.)
+          NEXT_PUBLIC_APP_URL: https://zeniipo.com
+
+  quet-bao-mat:
+    name: Quét phụ thuộc
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,3 +57,35 @@ jobs:
         with: { node-version: '20', cache: 'pnpm' }
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --audit-level=high || true
+
+  deploy:
+    name: Deploy lên Zeni Cloud
+    # CHỈ chạy khi đã kiểm xong — không bao giờ deploy bản chưa qua test.
+    needs: [kiem-tra]
+    # Tự động khi đẩy lên `main`; các nhánh khác phải bấm tay (workflow_dispatch).
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      github.event_name == 'workflow_dispatch' && inputs.deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      # `apps/web/.env.production` KHÔNG nằm trong git (biến công khai inline lúc
+      # build). Dựng lại từ secrets của kho để bản deploy khớp bản chạy tay.
+      - name: Dựng .env.production
+        run: |
+          mkdir -p apps/web
+          cat > apps/web/.env.production <<EOF
+          NEXT_PUBLIC_APP_URL=https://zeniipo.com
+          EOF
+
+      - name: Gửi lên Zeni Cloud
+        env:
+          ZENICLOUD_API: ${{ secrets.ZENICLOUD_API }}
+          ZENICLOUD_WS: ${{ secrets.ZENICLOUD_WS }}
+          ZENICLOUD_API_TOKEN: ${{ secrets.ZENICLOUD_API_TOKEN }}
+          # Trên CI, mã đã ở đúng commit của GitHub rồi nên bỏ qua cổng chặn git.
+          ZENI_DEPLOY_SKIP_GIT_CHECK: '1'
+        run: node scripts/deploy-zenicloud.mjs

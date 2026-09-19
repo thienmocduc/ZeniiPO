@@ -1,69 +1,45 @@
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-// GET: list enrolled factors
+/**
+ * MFA/TOTP trước đây chạy trên Supabase Auth (đã thu hồi). Tài khoản giờ là
+ * Zeni ID (Lớp 5) — MFA quản lý ở tầng nền tảng; app sẽ bật lại khi Zeni ID
+ * expose API MFA. Fail-closed: trả 501 rõ ràng, không giả lập.
+ */
+const NOT_READY = {
+  error: 'MFA đã chuyển sang Zeni ID (Lớp 5). Quản lý bảo mật tài khoản tại zenicloud.io — app sẽ bật lại khi nền tảng mở API MFA.',
+}
+
+async function requireUser() {
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
+
 export async function GET() {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { data, error } = await supabase.auth.mfa.listFactors()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+  // Danh sách factor rỗng — để UI hiện trạng thái "chưa bật" thay vì crash.
+  return NextResponse.json({ data: { totp: [], all: [] }, notice: NOT_READY.error })
 }
 
-// POST: enroll new TOTP factor → returns qr_code + secret + factor_id (caller must verify next).
 export async function POST() {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: `Zeniipo ${new Date().toISOString()}` })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+  return NextResponse.json(NOT_READY, { status: 501 })
 }
 
-// PATCH: verify pending factor with 6-digit code from authenticator app.
-const VerifySchema = z.object({
-  factor_id: z.string().uuid(),
-  code: z.string().regex(/^\d{6}$/, 'Code phải là 6 chữ số'),
-})
-export async function PATCH(req: Request) {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export async function PATCH() {
+  const user = await requireUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const body = await req.json().catch(() => ({}))
-  const parsed = VerifySchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-  }
-  const challenge = await supabase.auth.mfa.challenge({ factorId: parsed.data.factor_id })
-  if (challenge.error) return NextResponse.json({ error: challenge.error.message }, { status: 400 })
-  const verify = await supabase.auth.mfa.verify({
-    factorId: parsed.data.factor_id,
-    challengeId: challenge.data.id,
-    code: parsed.data.code,
-  })
-  if (verify.error) return NextResponse.json({ error: verify.error.message }, { status: 400 })
-  return NextResponse.json({ data: verify.data })
+  return NextResponse.json(NOT_READY, { status: 501 })
 }
 
-// DELETE: unenroll a factor.
-const UnenrollSchema = z.object({ factor_id: z.string().uuid() })
-export async function DELETE(req: Request) {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export async function DELETE() {
+  const user = await requireUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const body = await req.json().catch(() => ({}))
-  const parsed = UnenrollSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-  }
-  const { data, error } = await supabase.auth.mfa.unenroll({ factorId: parsed.data.factor_id })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+  return NextResponse.json(NOT_READY, { status: 501 })
 }

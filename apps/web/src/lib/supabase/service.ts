@@ -1,25 +1,23 @@
-import { createClient as createSb, type SupabaseClient } from '@supabase/supabase-js'
-
 /**
- * Service-role Supabase client — bypasses RLS. ONLY use from server contexts
- * that have already verified caller identity (cron jobs with isAuthorizedCron,
- * webhook handlers with signature verification, etc.).
- *
- * Never expose this client to client components or to API routes that accept
- * unauthenticated user input — a leaked service role key is equivalent to
- * full database admin.
+ * SERVICE CLIENT (bypass RLS) — ruột đã đổi sang Zeni Postgres (P2).
+ * Kết nối pool chạy dưới user owner (KHÔNG SET ROLE) → không bị RLS chặn,
+ * đúng ngữ nghĩa service_role cũ. CHỈ dùng ở server context đã tự xác thực
+ * (cron + CRON_SECRET, ingest token-hash, internal x-internal-key, console
+ * sau khi check is_chairman_super) — tuyệt đối không nhận input người dùng
+ * chưa kiểm soát.
  */
-let cached: SupabaseClient | null = null
+import { getPool } from '@/lib/zeni/db'
+import { makeClient, type Runner, type ZeniClient } from '@/lib/zeni/compat'
 
-export function createServiceClient(): SupabaseClient {
+let cached: ZeniClient | null = null
+
+export function createServiceClient(): ZeniClient {
   if (cached) return cached
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) {
-    throw new Error('SUPABASE service role env missing — cannot create service client')
-  }
-  cached = createSb(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  const runner: Runner = async (work) =>
+    work(async (text, params) => {
+      const res = await getPool().query(text, params as never[])
+      return { rows: res.rows, rowCount: res.rowCount }
+    })
+  cached = makeClient(runner, async () => null)
   return cached
 }

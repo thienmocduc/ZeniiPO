@@ -8,11 +8,41 @@ test.describe('Smoke · public surface', () => {
     await expect(page.locator('body')).toBeVisible()
   })
 
-  test('login page renders with email + password fields', async ({ page }) => {
+  test('login page renders with email + password + SUBMIT BUTTON', async ({ page }) => {
     await page.goto('/login')
-    // V1 login form uses #loginEmail / #loginPassword (no aria roles set).
-    await expect(page.locator('#loginEmail, input[type="email"]').first()).toBeVisible()
-    await expect(page.locator('#loginPassword, input[type="password"]').first()).toBeVisible()
+    await expect(page.locator('input[type="email"]').first()).toBeVisible()
+    await expect(page.locator('input[type="password"]').first()).toBeVisible()
+
+    // ⚠ Bài học 19/09/2026: test cũ chỉ kiểm 2 ô nhập, KHÔNG kiểm nút bấm. Một
+    // biến đổi HTML đã xoá mất nút Đăng nhập trên bản chạy thật và test vẫn
+    // xanh — người dùng vào được trang nhưng không có gì để bấm.
+    await expect(page.locator('button[type="submit"], #loginBtn').first()).toBeVisible()
+
+    // Phải có đường sang đăng ký và quên mật khẩu — trước đây là chữ thường
+    // không bấm được / href="#".
+    await expect(page.locator('a[href="/signup"]')).toBeVisible()
+    await expect(page.locator('a[href="/forgot-password"]')).toBeVisible()
+  })
+
+  test('login page KHÔNG còn tàn dư bản dựng demo', async ({ page }) => {
+    await page.goto('/login')
+    const body = await page.locator('body').innerText()
+    // Ô "Công ty" và bộ chọn "Vai trò" của bản dựng không dùng cho đăng nhập
+    // thật (tổ chức + vai trò lấy từ hồ sơ), và dòng "DEMO credentials" là sai
+    // sự thật trên bản chạy thật.
+    expect(body).not.toContain('DEMO credentials')
+    expect(body).not.toContain('CHR-001')
+    expect(body).not.toContain('ANIMA Care Global')
+  })
+
+  test('gõ Enter cũng đăng nhập được (không chỉ bấm nút)', async ({ page }) => {
+    await page.goto('/login')
+    await page.locator('input[type="email"]').first().fill('khong-ton-tai@zeniipo.com')
+    await page.locator('input[type="password"]').first().fill('sai-mat-khau')
+    await page.locator('input[type="password"]').first().press('Enter')
+    // Đúng/sai mật khẩu không quan trọng — chỉ cần form CÓ gửi đi, tức là hiện
+    // được thông báo lỗi. Bản cũ gắn sự kiện vào cú nhấp nên Enter không làm gì.
+    await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 15000 })
   })
 
   test('signup page renders', async ({ page }) => {

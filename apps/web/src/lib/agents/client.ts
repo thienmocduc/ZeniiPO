@@ -1,41 +1,77 @@
-import Anthropic from '@anthropic-ai/sdk'
-
 /**
- * Anthropic client singleton for the 108 Agent Legion + Council of 9 Validator.
+ * AI client — DeepSeek (OpenAI-compatible) for the Council of 9 Validator,
+ * the 108 Agent Legion, and NLQ.
  *
- * Reads ANTHROPIC_API_KEY from env at first call. Throws a clear error if missing
- * so API routes can return 503 "Service unavailable" with an actionable message.
+ * Chairman 2026-06-05: AI runs on DeepSeek (key in env, see feedback_zeniipo_ai_witsagi).
+ * DeepSeek exposes an OpenAI-compatible chat-completions endpoint, so we call it
+ * with raw fetch — no SDK dependency. If DEEPSEEK_API_KEY is missing, callers
+ * surface a 503 "AI disabled" so the UI degrades gracefully.
  */
-let cachedClient: Anthropic | null = null
 
-export function getAnthropicClient(): Anthropic {
-  if (cachedClient) return cachedClient
+// Provider-agnostic gateway config. PREFERRED: AI_* → point at the WitsAGI
+// gateway (it wraps deepseek-v4-pro + an agent harness for higher intelligence).
+// FALLBACK: DEEPSEEK_* (direct) so dev/test works before the WitsAGI key lands.
+// Any OpenAI-compatible /chat/completions endpoint works with zero code change —
+// just set AI_BASE_URL + AI_API_KEY + AI_MODEL_DEEP/FAST in env.
+const apiKey = () => process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || ''
+const baseUrl = () => process.env.AI_BASE_URL || process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
 
-  const key = process.env.ANTHROPIC_API_KEY
-  if (!key) {
-    throw new Error('ANTHROPIC_API_KEY missing — set in env to enable AI agents')
-  }
+/** Deep reasoning — Council of 9, strategic agents, multi-persona validation. */
+export const DEFAULT_MODEL = process.env.AI_MODEL_DEEP || 'deepseek-v4-pro'
+/** Fast — NLQ intent parsing, routine single-domain agent calls. */
+export const FAST_MODEL = process.env.AI_MODEL_FAST || 'deepseek-v4-flash'
 
-  cachedClient = new Anthropic({ apiKey: key })
-  return cachedClient
+/** True when the AI provider is configured. Routes gate 503 on this. */
+export function isAIConfigured(): boolean {
+  return Boolean(apiKey())
 }
+/** @deprecated name kept so existing route gates keep compiling. */
+export const isAnthropicConfigured = isAIConfigured
+
+export type ChatResult = { text: string; inputTokens: number; outputTokens: number; model: string }
 
 /**
- * Default model for deep reasoning — Council of 9, strategic agents,
- * multi-persona validation. Slower + higher cost but better judgment.
+ * One chat completion against DeepSeek. Returns the assistant text + token
+ * usage. Throws (with status) on transport/API error so callers can 5xx.
  */
-export const DEFAULT_MODEL = 'claude-opus-4-5' as const
+export async function chatComplete(opts: {
+  system?: string
+  user: string
+  model?: string
+  maxTokens?: number
+  temperature?: number
+}): Promise<ChatResult> {
+  const key = apiKey()
+  if (!key) throw new Error('AI provider not configured — set AI_API_KEY (WitsAGI gateway) or DEEPSEEK_API_KEY')
 
-/**
- * Fast model for routine agent calls — single-domain lookups, quick summaries,
- * high-volume dispatches. Input/output ~15x cheaper than Opus.
- */
-export const FAST_MODEL = 'claude-haiku-4-5-20251001' as const
+  const messages: Array<{ role: 'system' | 'user'; content: string }> = []
+  if (opts.system) messages.push({ role: 'system', content: opts.system })
+  messages.push({ role: 'user', content: opts.user })
 
-/**
- * Returns true when the Anthropic API is configured. Use in API routes to
- * gate 503 responses before invoking agent logic.
- */
-export function isAnthropicConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
+  const res = await fetch(`${baseUrl()}/chat/completions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: opts.model ?? DEFAULT_MODEL,
+      messages,
+      max_tokens: opts.maxTokens ?? 2048,
+      temperature: opts.temperature ?? 0.7,
+      stream: false,
+    }),
+  })
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`DeepSeek ${res.status}: ${t.slice(0, 300)}`)
+  }
+  const j = (await res.json()) as {
+    model?: string
+    choices?: Array<{ message?: { content?: string } }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
+  }
+  return {
+    text: j.choices?.[0]?.message?.content ?? '',
+    inputTokens: j.usage?.prompt_tokens ?? 0,
+    outputTokens: j.usage?.completion_tokens ?? 0,
+    model: j.model ?? opts.model ?? DEFAULT_MODEL,
+  }
 }
