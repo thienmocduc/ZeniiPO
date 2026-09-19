@@ -59,10 +59,24 @@ test.describe('Smoke · public surface', () => {
     await page.goto('/login')
     await page.locator('input[type="email"]').first().fill('khong-ton-tai@zeniipo.com')
     await page.locator('input[type="password"]').first().fill('sai-mat-khau')
+
+    // ⚠ BẢN CŨ CỦA TEST NÀY XANH VÌ LÝ DO SAI (phát hiện 20/09/2026): nó chờ
+    // `[role="alert"]` hiện ra, nhưng Next.js tự chèn `#__next-route-announcer__`
+    // mang đúng vai trò đó vào MỌI trang — luôn hiện, chữ rỗng. Nên test xanh kể
+    // cả khi gõ Enter không gửi gì cả. Nó canh đúng thứ mình muốn canh: KHÔNG.
+    //
+    // Nay canh thẳng vào bằng chứng không thể giả: có một lượt gọi thật tới
+    // API đăng nhập. Đúng/sai mật khẩu không quan trọng — chỉ cần form CÓ gửi.
+    const goiApi = page.waitForResponse(
+      (r) => r.url().includes('/api/auth/zeni/login') && r.request().method() === 'POST',
+      { timeout: 15000 },
+    )
     await page.locator('input[type="password"]').first().press('Enter')
-    // Đúng/sai mật khẩu không quan trọng — chỉ cần form CÓ gửi đi, tức là hiện
-    // được thông báo lỗi. Bản cũ gắn sự kiện vào cú nhấp nên Enter không làm gì.
-    await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 15000 })
+    const res = await goiApi
+    expect(res.status()).toBe(401) // sai mật khẩu — tới được backend là đạt
+
+    // Và người dùng phải THẤY lỗi, không phải im lặng.
+    await expect(page.getByTestId('loi-dang-nhap')).toBeVisible({ timeout: 10000 })
   })
 
   test('signup page renders', async ({ page }) => {

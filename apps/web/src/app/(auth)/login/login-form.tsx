@@ -109,6 +109,11 @@ export function LoginForm() {
       {authError && (
         <div
           role="alert"
+          // Nhãn riêng để test bám vào. KHÔNG được để test dò `[role="alert"]`
+          // chung chung: Next.js tự chèn `#__next-route-announcer__` mang đúng
+          // vai trò đó vào MỌI trang, luôn hiện (ẩn 1px) và rỗng chữ — test dò
+          // như vậy sẽ XANH kể cả khi form không hề gửi đi. Đã dính 20/09/2026.
+          data-testid="loi-dang-nhap"
           className="mb-5 rounded border border-err/40 bg-err/10 px-4 py-3 text-sm text-err"
         >
           {authError}

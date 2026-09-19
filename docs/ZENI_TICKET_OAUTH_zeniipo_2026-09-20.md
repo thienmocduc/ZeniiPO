@@ -54,6 +54,32 @@ return RedirectResponse(url=f"{dich}#oauth={fragment}", status_code=302)
 sẽ bắn token về zenicloud.io. ZeniIPO khác tên miền gốc nên không đọc được
 cookie lẫn fragment đó.
 
+## 3b. Đã tự kiểm đường tự phục vụ trước khi mở ticket
+
+Nền tảng có sẵn luồng OAuth theo workspace (`/auth/{provider}/{ws}/login`) cho
+khách tự khai `app_callback_url` của mình — ZeniIPO gọi thử bằng token của
+workspace, **chạy được**:
+
+```
+GET /api/v1/identity/oauth-providers?ws=zeniipo-com      → 200  []
+GET /api/v1/identity/oauth-providers/templates           → 200  (có mẫu google)
+```
+
+Nghĩa là ZeniIPO **tự khai provider được, không cần các anh động tay**. Nhưng
+đường đó vẫn kẹt hai chỗ nên ZeniIPO không chọn:
+
+1. Nó cần **cặp khoá Google riêng của ZeniIPO** (`client_id` + `client_secret`),
+   mà workspace này chưa có và tạo khoá là việc ở Google Console.
+2. `customer_oauth_flow.py` trả người dùng về app kèm `?email=…&access_token=…`
+   dưới dạng tham số truy vấn **không ký**. App nào tin thẳng tham số đó thì bất
+   kỳ ai cũng tự đăng nhập được bằng cách gõ tay URL kèm email người khác.
+   Muốn dùng an toàn, app phải tự đi hỏi lại Google để xác minh token — thêm một
+   đường phụ thuộc trực tiếp ra ngoài, trái với việc gom danh tính về Lớp 05.
+
+Đường ở mục 4a dưới đây trả về **JWT Zeni ID thật** (xác minh được qua
+`/auth/me`), giữ đúng nguyên tắc một danh tính cho cả hệ sinh thái, và phía các
+anh chỉ tốn một dòng cấu hình. Vì vậy ZeniIPO đề nghị 4a.
+
 ## 4. Đề nghị
 
 ### 4a. (BẮT BUỘC) Thêm origin của ZeniIPO vào danh sách trắng

@@ -14,33 +14,40 @@ import { test, expect } from '@playwright/test'
  *     người đọc kết quả không phân biệt được lỗi sản phẩm với lỗi thiếu dữ liệu.
  *
  * Nay: chưa khai biến ⇒ BỎ QUA, kèm lý do rõ. Muốn chạy thì khai
- * `E2E_ANIMA_EMAIL` và `E2E_ANIMA_PASSWORD` (máy cá nhân dùng .env.local, CI
+ * `E2E_TEST_EMAIL` và `E2E_TEST_PASSWORD` (máy cá nhân dùng .env.local, CI
  * dùng secrets của kho).
  */
-const ANIMA_EMAIL = process.env.E2E_ANIMA_EMAIL
-const ANIMA_PASS = process.env.E2E_ANIMA_PASSWORD
+const TAI_KHOAN = process.env.E2E_TEST_EMAIL
+const MAT_KHAU = process.env.E2E_TEST_PASSWORD
 
-test.describe('Anima Chairman · luồng đã đăng nhập', () => {
+test.describe('Luồng đã đăng nhập (cần tài khoản thử)', () => {
   test.skip(
-    !ANIMA_EMAIL || !ANIMA_PASS,
-    'Chưa khai E2E_ANIMA_EMAIL / E2E_ANIMA_PASSWORD — không có tài khoản thật để thử.',
+    !TAI_KHOAN || !MAT_KHAU,
+    'Chưa khai E2E_TEST_EMAIL / E2E_TEST_PASSWORD — không có tài khoản thật để thử.',
   )
 
   /** Đăng nhập rồi chờ rời khỏi màn hình đăng nhập. */
   async function dangNhap(page: import('@playwright/test').Page) {
     await page.goto('/login')
-    await page.locator('input[type="email"]').first().fill(ANIMA_EMAIL!)
-    await page.locator('input[type="password"]').first().fill(ANIMA_PASS!)
+    await page.locator('input[type="email"]').first().fill(TAI_KHOAN!)
+    await page.locator('input[type="password"]').first().fill(MAT_KHAU!)
     await page.locator('#loginBtn, button[type="submit"]').first().click()
 
     // Sai mật khẩu thì màn hình hiện dải báo lỗi — bắt trường hợp đó và nói
     // thẳng, thay vì để hết giờ chờ rồi báo một lỗi điều hướng khó hiểu.
-    const loi = page.locator('[role="alert"]')
-    const doi = await Promise.race([
-      page.waitForURL(/\/(onboarding|dashboard)/, { timeout: 15000 }).then(() => 'vao-duoc'),
-      loi.waitFor({ state: 'visible', timeout: 15000 }).then(() => 'bi-tu-choi'),
+    //
+    // ⚠ BẪY đã dính (20/09/2026): dò `[role="alert"]` chung chung là SAI —
+    // Next.js tự chèn `#__next-route-announcer__` mang đúng vai trò đó vào MỌI
+    // trang, luôn hiện và chữ rỗng. Cuộc đua vì thế luôn được "thấy cảnh báo"
+    // thắng, và test báo "đăng nhập bị từ chối" với nội dung RỖNG trong khi
+    // người dùng đã vào tới bảng điều khiển. Phải bám nhãn riêng của app.
+    const loi = page.getByTestId('loi-dang-nhap')
+    const ketQua = await Promise.race([
+      page.waitForURL(/\/(onboarding|dashboard)/, { timeout: 20000 }).then(() => 'vao-duoc' as const),
+      loi.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'bi-tu-choi' as const),
     ])
-    if (doi === 'bi-tu-choi') {
+
+    if (ketQua === 'bi-tu-choi') {
       throw new Error(`Đăng nhập bị từ chối: "${await loi.innerText()}" — kiểm lại tài khoản thử.`)
     }
   }
