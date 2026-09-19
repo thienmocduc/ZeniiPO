@@ -79,6 +79,29 @@ test.describe('Smoke · public surface', () => {
     await expect(page.getByTestId('loi-dang-nhap')).toBeVisible({ timeout: 10000 })
   })
 
+  test('quên mật khẩu PHẢI gọi được Zeni ID, không báo "chưa mở chức năng"', async ({ page }) => {
+    // Chairman tự đâm phải lỗi này 20/09/2026: màn hình báo "Zeni ID chưa mở
+    // chức năng đặt lại mật khẩu" — MỘT LỜI NÓI SAI SỰ THẬT. Nền tảng có sẵn
+    // `/auth/password/forgot/init`; app chỉ dò sai tên đường dẫn rồi đổ lỗi.
+    await page.goto('/forgot-password')
+
+    const goi = page.waitForResponse(
+      (r) => r.url().includes('/api/auth/zeni/forgot') && r.request().method() === 'POST',
+      { timeout: 20000 },
+    )
+    await page.locator('input[type="email"]').first().fill('khong-ton-tai@zeniipo.com')
+    await page.locator('button[type="submit"]').first().click()
+    const res = await goi
+
+    // 200 = đã nhờ gửi (nền tảng luôn trả lời giống nhau để chống dò email).
+    // 429 = bị chặn vì gọi quá 3 lần / 15 phút — VẪN chứng minh đã tới đúng nơi.
+    // Tuyệt đối không được là 501 "chưa mở chức năng".
+    expect([200, 429]).toContain(res.status())
+
+    const body = await page.locator('body').innerText()
+    expect(body).not.toContain('chưa mở chức năng')
+  })
+
   test('signup page renders', async ({ page }) => {
     await page.goto('/signup')
     await expect(page.locator('input[type="email"]').first()).toBeVisible()

@@ -97,6 +97,9 @@ export default function ForgotPasswordPage() {
       {authError && (
         <div
           role="alert"
+          // Nhãn riêng — KHÔNG để test dò `[role="alert"]` chung chung (Next.js
+          // tự chèn route announcer mang vai trò đó vào mọi trang).
+          data-testid="loi-quen-mat-khau"
           className="mb-5 rounded border border-err/40 bg-err/10 px-4 py-3 text-sm text-err"
         >
           {authError}
