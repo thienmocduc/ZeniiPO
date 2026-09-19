@@ -28,6 +28,19 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
+import { oauthDaBat } from '@/lib/zeni/oauth';
+
+/** Logo Google đúng 4 màu — dùng chữ "G" tự vẽ là vi phạm quy chuẩn thương hiệu. */
+function LogoGoogle() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#FFC107" d="M43.6 20.5h-1.9V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.0 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.0 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5h-1.9V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C39.2 35.9 44 30.6 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
+  );
+}
 
 const schema = z.object({
   email: z.string().min(1, 'Nhập email').email('Email không hợp lệ'),
@@ -102,6 +115,28 @@ export function LoginForm() {
         </div>
       )}
 
+      {/* Đăng nhập bằng nhà cung cấp ngoài — đi qua Zeni ID, app KHÔNG tự đấu
+          Google. Nút bị khoá sau cờ cho tới khi nền tảng thêm zeniipo.com vào
+          danh sách trắng nhận token; chi tiết ở `@/lib/zeni/oauth`. Thà chưa
+          hiện còn hơn hiện một nút bấm vào thì lạc sang tên miền khác. */}
+      {oauthDaBat() && (
+        <>
+          <a
+            href={`/api/auth/zeni/oauth/google?redirect=${encodeURIComponent(redirect)}`}
+            className="mb-5 flex w-full items-center justify-center gap-3 rounded border border-w-12 bg-panel-2 px-8 py-3 font-medium text-ivory transition hover:border-gold/50 hover:bg-panel"
+          >
+            <LogoGoogle />
+            Tiếp tục với Google
+          </a>
+
+          <div className="mb-5 flex items-center gap-4">
+            <span className="h-px flex-1 bg-w-12" />
+            <span className="font-mono text-2xs uppercase tracking-widest text-ink-dim">hoặc</span>
+            <span className="h-px flex-1 bg-w-12" />
+          </div>
+        </>
+      )}
+
       {/* `onSubmit` của form ⇒ gõ Enter cũng đăng nhập được (bản cũ không) */}
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <div>
@@ -167,17 +202,26 @@ export function LoginForm() {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-ink-2">
-        Chưa có tài khoản?{' '}
-        <Link href="/signup" className="text-gold-light hover:text-gold underline underline-offset-4">
-          Đăng ký Zeni ID
+      {/* Đăng ký là NÚT viền, không phải chữ nhỏ lẫn vào chú thích.
+          Chairman nhìn màn hình cũ và hỏi "web độc lập thì phải có trường đăng
+          ký chứ?" — trường đó vẫn luôn có, chỉ là trình bày mờ tới mức không
+          thấy. Người dùng mới là nhóm đọc màn hình này kỹ nhất. */}
+      <div className="mt-8 border-t border-w-12 pt-6 text-center">
+        <p className="mb-3 text-sm text-ink-2">Chưa có tài khoản?</p>
+        <Link
+          href="/signup"
+          className="inline-flex w-full items-center justify-center rounded border border-gold/50 px-8 py-3 font-semibold text-gold-light transition hover:border-gold hover:bg-gold/10"
+        >
+          Đăng ký miễn phí
         </Link>
-      </p>
+      </div>
 
-      <p className="mt-4 text-center text-2xs text-ink-dim leading-relaxed">
-        Một tài khoản Zeni ID dùng chung cho mọi sản phẩm Zeni Holdings
-        (zenicloud.io · ZeniIPO · Zeni Digital). Tổ chức và vai trò của bạn được
-        lấy tự động từ hồ sơ — không cần chọn khi đăng nhập.
+      <p className="mt-5 text-center text-2xs leading-relaxed text-ink-dim">
+        Đăng ký ngay tại đây — <strong className="text-ink-2">không cần</strong> có sẵn
+        tài khoản ở sản phẩm Zeni nào khác. Tài khoản tạo ra là một{' '}
+        <strong className="text-ink-2">Zeni ID</strong>, dùng chung được cho mọi sản phẩm
+        Zeni Holdings (zenicloud.io · ZeniIPO · Zeni Digital). Tổ chức và vai trò của bạn
+        được lấy tự động từ hồ sơ — không cần chọn khi đăng nhập.
       </p>
     </div>
   );

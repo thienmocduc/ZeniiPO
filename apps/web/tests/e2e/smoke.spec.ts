@@ -24,6 +24,26 @@ test.describe('Smoke · public surface', () => {
     await expect(page.locator('a[href="/forgot-password"]')).toBeVisible()
   })
 
+  test('đường đăng ký phải NỔI RÕ, không lẫn vào chú thích', async ({ page }) => {
+    await page.goto('/login')
+    // Chairman nhìn màn hình cũ và hỏi "web độc lập thì phải có trường đăng ký
+    // chứ?" — trường đó vẫn luôn có, chỉ là trình bày mờ tới mức không thấy.
+    const nut = page.locator('a[href="/signup"]')
+    await expect(nut).toBeVisible()
+    await expect(nut).toContainText(/Đăng ký/i)
+
+    // Và phải nói thẳng: KHÔNG cần có sẵn tài khoản ở sản phẩm Zeni khác.
+    await expect(page.locator('body')).toContainText(/không cần/i)
+  })
+
+  test('bấm Đăng ký sang được trang tạo tài khoản thật', async ({ page }) => {
+    await page.goto('/login')
+    await page.locator('a[href="/signup"]').click()
+    await expect(page).toHaveURL(/\/signup/)
+    await expect(page.locator('input[type="email"]').first()).toBeVisible()
+    await expect(page.locator('input[type="password"]').first()).toBeVisible()
+  })
+
   test('login page KHÔNG còn tàn dư bản dựng demo', async ({ page }) => {
     await page.goto('/login')
     const body = await page.locator('body').innerText()
