@@ -137,13 +137,30 @@ export function V1DataBind({ pageId, initialData, children }: DataBindProps) {
     if (!data) return
     const patcher = PAGE_PATCHERS[pageId]
     if (!patcher) return
+    // Đếm lại từ đầu cho lượt chạy này.
+    soOdaVa = 0
+    /**
+     * Hàm vá chạy xong mà KHÔNG chạm được ô nào ⇒ toàn bộ số trên trang vẫn là
+     * số minh hoạ của công ty mẫu. Trước đây trường hợp này im lặng tuyệt đối —
+     * nguy hiểm hơn cả lỗi mạng, vì lỗi mạng ít ra còn hiện cảnh báo.
+     */
+    const kiemSauKhiVa = () => {
+      if (soOdaVa === 0) {
+        markUnmeasured(pageId, 'nguồn trả về nhưng không khớp được ô nào trên trang')
+      }
+    }
+
     try {
       const r = patcher(data)
       if (r && typeof (r as Promise<void>).catch === 'function') {
-        ;(r as Promise<void>).catch((err) => {
-          markUnmeasured(pageId, 'lỗi khi dựng số liệu lên màn hình')
-          if (process.env.NODE_ENV !== 'production') console.error('[v1-data-bind] patch async', pageId, err)
-        })
+        ;(r as Promise<void>)
+          .then(kiemSauKhiVa)
+          .catch((err) => {
+            markUnmeasured(pageId, 'lỗi khi dựng số liệu lên màn hình')
+            if (process.env.NODE_ENV !== 'production') console.error('[v1-data-bind] patch async', pageId, err)
+          })
+      } else {
+        kiemSauKhiVa()
       }
     } catch (err) {
       // Patcher vỡ giữa chừng = trang nửa thật nửa minh hoạ → nguy hiểm nhất.
@@ -201,6 +218,24 @@ function escapeHtml(s: string): string {
  * Hàm này thay mọi số minh hoạ bằng "chưa đo được" + treo cảnh báo đầu trang.
  * Thà trống còn hơn sai — nhất là với nền tảng tài chính.
  */
+/**
+ * ĐẾM SỐ Ô THẬT SỰ ĐƯỢC VÁ trong một lượt chạy hàm vá.
+ *
+ * VÌ SAO CẦN (bản đồ trang 20/09/2026): `markUnmeasured` cũ CHỈ bảo vệ nhánh
+ * gọi API LỖI. Còn đường nguy hiểm nhất là: API trả 200, hàm vá chạy trọn,
+ * nhưng không chạm được ô nào — vì trang không có `.kpi-row` (21 trang) hoặc
+ * không có `table.tbl` (7 trang). Khi đó **số minh hoạ đứng nguyên và KHÔNG có
+ * một lời cảnh báo nào**. Người đọc tưởng đang xem số liệu công ty mình.
+ *
+ * Đếm được 531/986 ô trên toàn hệ đang là số cứng (53,9%). Vá từng ô là việc
+ * dài; nhưng CẢNH BÁO đúng thì phải có ngay — thà ô trống ghi "chưa đo được"
+ * còn hơn một con số bịa trông như thật.
+ */
+let soOdaVa = 0
+const demVa = (n = 1) => {
+  soOdaVa += n
+}
+
 function markUnmeasured(pageId: string, reason: string): void {
   if (typeof document === 'undefined') return
   const root = document.getElementById(pageId)
@@ -241,12 +276,18 @@ function patchKpiCards(
   cards: Array<{ value: string | number; label?: string; sub?: string } | null>,
 ) {
   const cardsEl = root.querySelectorAll<HTMLElement>('.kpi-row .kpi-card')
+  if (cardsEl.length === 0) {
+    // Trang không có khối `.kpi-row` — hàm chạy xong mà không vá gì, và trước
+    // đây im lặng hoàn toàn. 21 trang đang rơi vào đúng trường hợp này.
+    console.warn('[v1-data-bind] không tìm thấy .kpi-row — số liệu KPI không vá được')
+    return
+  }
   cards.forEach((c, i) => {
     if (!c || !cardsEl[i]) return
     const v = cardsEl[i].querySelector<HTMLElement>('.kpi-v')
     const l = cardsEl[i].querySelector<HTMLElement>('.kpi-lbl')
     const s = cardsEl[i].querySelector<HTMLElement>('.kpi-sub')
-    if (v) v.innerHTML = String(c.value)
+    if (v) { v.innerHTML = String(c.value); demVa() }
     if (l && c.label) l.textContent = c.label
     if (s && c.sub) s.textContent = c.sub
   })
@@ -272,7 +313,13 @@ function patchTable(
     if (t) { tbody = t; break }
   }
   if (!tbody) tbody = (root as ParentNode).querySelector<HTMLTableSectionElement>('table.tbl tbody')
-  if (!tbody) return
+  if (!tbody) {
+    // 7 trang không hề có `table.tbl` — dữ liệu API đã dựng thành `rows` bị
+    // huỷ âm thầm ở đây. Ghi log để lần sau nhìn thấy.
+    console.warn(`[v1-data-bind] không tìm thấy bảng "${cardSel}" — ${rows.length} dòng dữ liệu bị bỏ`)
+    return
+  }
+  demVa(Math.max(rows.length, 1))
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--dim);font-style:italic;padding:18px">${escapeHtml(emptyMessage)}</td></tr>`
     return
