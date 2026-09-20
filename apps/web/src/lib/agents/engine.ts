@@ -7,19 +7,19 @@ import { buildTenantSnapshot } from './context-builder'
 import { sanitizeAction, executeAction, type ProposedAction } from './action-executor'
 
 /**
- * AGENT ENGINE Ã¢â‚¬â€ the autonomous heartbeat of the 108 Legion.
+ * AGENT ENGINE — the autonomous heartbeat of the 108 Legion.
  *
- * Cron tick Ã¢â€ â€™ due agent_schedules Ã¢â€ â€™ for each: assemble tenant snapshot Ã¢â€ â€™
- * playbook-composed supagent run Ã¢â€ â€™ parse structured {summary, insights,
- * actions} Ã¢â€ â€™ persist run + memory Ã¢â€ â€™ actions either auto-execute
+ * Cron tick → due agent_schedules → for each: assemble tenant snapshot →
+ * playbook-composed supagent run → parse structured {summary, insights,
+ * actions} → persist run + memory → actions either auto-execute
  * (autonomy='auto') or land as proposals awaiting 1-click approval.
  *
  * Design guarantees:
- *  - graceful degradation: AI unconfigured Ã¢â€ â€™ tick reports skipped (no error)
+ *  - graceful degradation: AI unconfigured → tick reports skipped (no error)
  *  - per-schedule isolation: one tenant/agent failure never blocks the rest
- *  - bounded cost: MAX_RUNS_PER_TICK caps each tick; context Ã¢â€°Â¤ ~3k tokens
+ *  - bounded cost: MAX_RUNS_PER_TICK caps each tick; context ≤ ~3k tokens
  *  - log_insight always auto-executes (harmless); risky types gate on
- *    autonomy Ã¢â‚¬â€ the human stays in the loop until they opt out per agent.
+ *    autonomy — the human stays in the loop until they opt out per agent.
  */
 
 const MAX_RUNS_PER_TICK = 6
@@ -45,7 +45,7 @@ type ParsedOutput = {
   actions?: unknown[]
 }
 
-/** Tolerant JSON extraction Ã¢â‚¬â€ models occasionally wrap output in fences. */
+/** Tolerant JSON extraction — models occasionally wrap output in fences. */
 export function parseAgentJson(text: string): ParsedOutput | null {
   const start = text.indexOf('{')
   const end = text.lastIndexOf('}')
@@ -60,7 +60,7 @@ export function parseAgentJson(text: string): ParsedOutput | null {
 /**
  * Auto-provision default schedules: every tenant with an active IPO journey
  * gets its 12 chief supagents on a weekly cadence (staggered so one tick
- * never runs a whole tenant at once). Idempotent Ã¢â‚¬â€ skips tenants that
+ * never runs a whole tenant at once). Idempotent — skips tenants that
  * already have any schedule.
  */
 export async function provisionDefaultSchedules(sb: ZeniClient): Promise<number> {
@@ -141,6 +141,13 @@ export type ScheduleRunResult = {
   error?: string
 }
 
+/**
+ * PHIÊN BẢN LỜI NHẮC — tăng lên MỖI LẦN sửa system prompt, playbook, hoặc
+ * ACTION_CONTRACT. Không tăng thì hai lần chạy khác hẳn nhau lại trông như
+ * nhau, và không ai giải thích được vì sao agent đổi hành vi.
+ */
+const PROMPT_VERSION = 'pb-2026-09-20'
+
 async function runOneSchedule(sb: ZeniClient, sched: ScheduleRow): Promise<ScheduleRunResult> {
   const base: ScheduleRunResult = {
     schedule_id: sched.id,
@@ -160,12 +167,14 @@ async function runOneSchedule(sb: ZeniClient, sched: ScheduleRow): Promise<Sched
 ${playbookToPrompt(playbook)}
 
 ${ACTION_CONTRACT}`
-  const user = `CONTEXT (JSON snapshot cÃ¡Â»Â§a doanh nghiÃ¡Â»â€¡p, kÃ¡Â»Â³ ${new Date().toISOString().slice(0, 10)}):
+  const user = `CONTEXT (JSON snapshot của doanh nghiệp, kỳ ${new Date().toISOString().slice(0, 10)}):
 ${JSON.stringify(snapshot)}
 
-ThÃ¡Â»Â±c hiÃ¡Â»â€¡n chu kÃ¡Â»Â³ vÃ¡ÂºÂ­n hÃƒÂ nh tÃ¡Â»Â± Ã„â€˜Ã¡Â»â„¢ng cÃ¡Â»Â§a bÃ¡ÂºÂ¡n theo playbook: phÃƒÂ¢n tÃƒÂ­ch context, rÃ¡Â»â€œi trÃ¡ÂºÂ£ vÃ¡Â»Â JSON Ã„â€˜ÃƒÂºng contract.`
+Thực hiện chu kỳ vận hành tự động của bạn theo playbook: phân tích context, rồi trả về JSON đúng contract.`
 
+  const batDau = Date.now()
   const r = await chatComplete({ system, user, model: FAST_MODEL, maxTokens: 2048 })
+  const thoiLuongMs = Date.now() - batDau
   const parsed = parseAgentJson(r.text)
 
   const tenantAgentId = await resolveTenantAgentIdService(sb, sched.tenant_id, sched.agent_code)
@@ -183,12 +192,25 @@ ThÃ¡Â»Â±c hiÃ¡Â»â€¡n chu kÃ¡Â»Â³ vÃ¡ÂºÂ­n hÃƒÂ nh 
       .insert({
         agent_id: tenantAgentId,
         triggered_by: null, // autonomous cron run
-        input: { mode: 'engine', cadence: sched.cadence },
+        // Lưu ĐẦU VÀO THẬT, không chỉ vài nhãn. Bản cũ ghi mỗi
+        // `{mode, cadence}` nên không ai tái lập được lần chạy, và dấu vân
+        // tay đầu vào (input_hash, CSDL tự băm) cũng thành vô nghĩa.
+        input: {
+          mode: 'engine',
+          cadence: sched.cadence,
+          prompt_version: PROMPT_VERSION,
+          model_yeu_cau: FAST_MODEL,
+          snapshot,
+        },
         output: { text: r.text.slice(0, 8000), structured: parsed ?? null },
         tokens_input: r.inputTokens,
         tokens_output: r.outputTokens,
         cost_usd: cost,
-        duration_ms: 0,
+        duration_ms: thoiLuongMs,
+        // Mô hình THẬT SỰ trả lời, không phải mô hình được yêu cầu — nhà cung
+        // cấp có thể định tuyến sang bản khác mà không báo.
+        model: r.model ?? FAST_MODEL,
+        prompt_version: PROMPT_VERSION,
         status: parsed ? 'success' : 'failed',
         error_message: parsed ? null : 'unparseable agent JSON',
       })
@@ -207,7 +229,7 @@ ThÃ¡Â»Â±c hiÃ¡Â»â€¡n chu kÃ¡Â»Â³ vÃ¡ÂºÂ­n hÃƒÂ nh 
       tenant_id: sched.tenant_id,
       agent_code: sched.agent_code,
       kind: 'summary',
-      title: `Chu kÃ¡Â»Â³ ${new Date().toISOString().slice(0, 10)}`,
+      title: `Chu kỳ ${new Date().toISOString().slice(0, 10)}`,
       body: parsed.summary.slice(0, 4000),
     })
   }
@@ -224,7 +246,7 @@ ThÃ¡Â»Â±c hiÃ¡Â»â€¡n chu kÃ¡Â»Â³ vÃ¡ÂºÂ­n hÃƒÂ nh 
   }
   if (memRows.length > 0) await sb.from('agent_memory').insert(memRows)
 
-  // Actions: sanitize Ã¢â€ â€™ auto-execute or propose.
+  // Actions: sanitize → auto-execute or propose.
   const actions: ProposedAction[] = (parsed.actions ?? [])
     .slice(0, MAX_ACTIONS_PER_RUN)
     .map(sanitizeAction)
@@ -245,6 +267,9 @@ ThÃ¡Â»Â±c hiÃ¡Â»â€¡n chu kÃ¡Â»Â³ vÃ¡ÂºÂ­n hÃƒÂ nh 
         payload: action.payload,
         confidence: action.confidence ?? null,
         status: res.ok ? 'executed' : 'failed',
+        // Máy tự chạy theo autonomy — KHÔNG ai duyệt. Nói thẳng thay vì để
+        // `decided_by` NULL, vì NULL trông y hệt "người duyệt mà quên ghi tên".
+        quyet_dinh_boi: 'may',
         executed_at: new Date().toISOString(),
         result: res.result ?? null,
         error_message: res.error ?? null,
@@ -278,7 +303,7 @@ export type EngineTickResult = {
   results?: ScheduleRunResult[]
 }
 
-/** One engine heartbeat Ã¢â‚¬â€ called by /api/cron/agents. */
+/** One engine heartbeat — called by /api/cron/agents. */
 export async function tickAgentEngine(sb: ZeniClient): Promise<EngineTickResult> {
   if (!isAIConfigured()) {
     return { skipped: 'ai_not_configured' }
@@ -311,7 +336,7 @@ export async function tickAgentEngine(sb: ZeniClient): Promise<EngineTickResult>
         error: err instanceof Error ? err.message.slice(0, 300) : 'run failed',
       }
     }
-    // Always advance next_run_at Ã¢â‚¬â€ a failing agent must not wedge the queue.
+    // Always advance next_run_at — a failing agent must not wedge the queue.
     const interval = CADENCE_MS[sched.cadence] ?? CADENCE_MS.weekly
     await sb
       .from('agent_schedules')

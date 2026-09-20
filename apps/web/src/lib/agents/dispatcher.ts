@@ -15,11 +15,11 @@ import type { AgentCatalogRow, AgentRunInput, AgentRunOutput } from './types'
  * Note on clients: `agent_catalog` has RLS policy
  * `agent_catalog_public_read USING (true)` (migration 004), so the SSR client
  * (anon key) can read it. We intentionally do NOT require a service-role
- * client here Ã¢â‚¬â€ keeps env simple and avoids a privileged key in this path.
+ * client here — keeps env simple and avoids a privileged key in this path.
  * If we later add per-tenant agent restrictions on the catalog, we can switch.
  *
  * TODO Q2/2026: prompt caching via `cache_control` on the system prompt.
- *   Each agent's system prompt is static per agent_code Ã¢â‚¬â€ perfect for the
+ *   Each agent's system prompt is static per agent_code — perfect for the
  *   1h cache tier. Expected ~85% input-token discount on repeated calls.
  */
 
@@ -32,7 +32,7 @@ function pickModel(mode: AgentRunInput['mode']): string {
 
 export function buildSystemPrompt(agent: AgentCatalogRow): string {
   const chiefNote = agent.is_chief
-    ? `You are the CHIEF agent for the ${agent.department} department Ã¢â‚¬â€ you lead the nine-agent department squad.\n`
+    ? `You are the CHIEF agent for the ${agent.department} department — you lead the nine-agent department squad.\n`
     : ''
   const role = agent.role_description?.trim() || `${agent.department} specialist.`
 
@@ -41,7 +41,7 @@ Department: ${agent.department}
 Agent code: ${agent.agent_code}
 Role: ${role}
 ${chiefNote}
-Respond in the voice of ${agent.name} Ã¢â‚¬â€ concise, expert, action-oriented. Ground every answer in ${agent.department} best practice. When uncertain, say so explicitly rather than speculate. Prefer numbered lists and concrete next steps over prose. Output plain text (no markdown fences, no JSON) unless the user prompt explicitly asks for structured output.`
+Respond in the voice of ${agent.name} — concise, expert, action-oriented. Ground every answer in ${agent.department} best practice. When uncertain, say so explicitly rather than speculate. Prefer numbered lists and concrete next steps over prose. Output plain text (no markdown fences, no JSON) unless the user prompt explicitly asks for structured output.`
 }
 
 function buildUserPrompt(input: AgentRunInput): string {
@@ -53,7 +53,7 @@ function buildUserPrompt(input: AgentRunInput): string {
 
 /**
  * Fetches catalog metadata for an agent. Accepts either the `agent_code`
- * string (e.g. `fin-01-plutus`) Ã¢â‚¬â€ this is what the catalog exposes.
+ * string (e.g. `fin-01-plutus`) — this is what the catalog exposes.
  * Pass `sb` (e.g. the service client) in contexts without request cookies
  * (cron engine); defaults to the SSR client for route handlers.
  */
@@ -82,7 +82,7 @@ export async function loadAgentFromCatalog(
 /**
  * Dispatches a single agent run.
  *
- * Does NOT log to `agent_runs` Ã¢â‚¬â€ that's the route handler's job (it has the
+ * Does NOT log to `agent_runs` — that's the route handler's job (it has the
  * tenant_id + user_id context and can attach errors to the row). Keeps this
  * function pure and testable.
  */

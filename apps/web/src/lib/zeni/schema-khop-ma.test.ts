@@ -80,7 +80,14 @@ function giaTriChoPhep(): Map<string, Set<string>> {
   return ra;
 }
 
-/** Mọi tệp route.ts dưới src/app/api. */
+/**
+ * Mọi tệp CÓ THỂ nói chuyện với CSDL: route.ts dưới src/app/api, và cả các
+ * tệp .ts dưới src/lib.
+ *
+ * Bản đầu chỉ soi src/app/api nên bỏ lọt hẳn `src/lib/agents/engine.ts` —
+ * nơi ghi vào `agent_runs` và `agent_actions` mà không cửa API nào đi qua.
+ * Lệnh ghi nằm ở đâu thì lỗi lệch lược đồ nằm ở đó.
+ */
 function moiRoute(dir: string, ra: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
@@ -89,6 +96,21 @@ function moiRoute(dir: string, ra: string[] = []): string[] {
   }
   return ra;
 }
+
+/** Tệp .ts dưới src/lib (bỏ qua test). */
+function moiThuVien(dir: string, ra: string[] = []): string[] {
+  if (!fs.existsSync(dir)) return ra;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) moiThuVien(p, ra);
+    else if (e.name.endsWith('.ts') && !e.name.endsWith('.test.ts')) ra.push(p);
+  }
+  return ra;
+}
+
+const THU_MUC_LIB = path.join(process.cwd(), 'src', 'lib');
+/** Tất cả nơi có thể ghi xuống CSDL. */
+const moiNoiGhi = (): string[] => [...moiRoute(THU_MUC_API), ...moiThuVien(THU_MUC_LIB)];
 
 describe('Mã phải khớp lược đồ CSDL', () => {
   const bang = cotThatCuaBang();
@@ -103,7 +125,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
   it('1. mọi .order(cột) đều trỏ tới cột CÓ THẬT', () => {
     const hong: string[] = [];
 
-    for (const tep of moiRoute(THU_MUC_API)) {
+    for (const tep of moiNoiGhi()) {
       const ma = fs.readFileSync(tep, 'utf8');
       // `.from('bang')` … `.order('cot')` trong CÙNG một truy vấn.
       // `[^]*?` kèm chặn `.from('` ở giữa: không cho cửa sổ dò bắc cầu sang
@@ -116,7 +138,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
         if (!cots.has(cot)) {
           const goiY = [...cots].filter((c) => /_at$|date/.test(c)).slice(0, 3).join(', ');
           hong.push(
-            `${path.relative(THU_MUC_API, tep).replace(/\\/g, '/')} · ` +
+            `${path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/')} · ` +
               `${tenBang}.order('${cot}') KHÔNG tồn tại — cột thời gian có thật: ${goiY || '(không có)'}`,
           );
         }
@@ -133,7 +155,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
 
   it('2. mọi .eq(cột) trong route đều trỏ tới cột CÓ THẬT', () => {
     const hong: string[] = [];
-    for (const tep of moiRoute(THU_MUC_API)) {
+    for (const tep of moiNoiGhi()) {
       const ma = fs.readFileSync(tep, 'utf8');
       for (const m of ma.matchAll(/\.from\('(\w+)'\)((?:(?!\.from\(')[\s\S]){0,400}?)\.eq\('(\w+)'/g)) {
         const [, tenBang, , cot] = m;
@@ -141,7 +163,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
         if (!cots) continue;
         if (!cots.has(cot)) {
           hong.push(
-            `${path.relative(THU_MUC_API, tep).replace(/\\/g, '/')} · ${tenBang}.eq('${cot}') KHÔNG tồn tại`,
+            `${path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/')} · ${tenBang}.eq('${cot}') KHÔNG tồn tại`,
           );
         }
       }
@@ -161,7 +183,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
     // đồ zod khai trong cùng tệp), nhưng đó chính là dạng hay sai nhất.
     const hong: string[] = [];
 
-    for (const tep of moiRoute(THU_MUC_API)) {
+    for (const tep of moiNoiGhi()) {
       const ma = fs.readFileSync(tep, 'utf8');
 
       /** Khoá ở TẦNG NGOÀI CÙNG của một thân đối tượng (bỏ qua khoá lồng). */
@@ -215,7 +237,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
           if (!cots.has(c)) {
             const gan = [...cots].filter((x) => x.includes(c.split('_')[0])).slice(0, 2).join(', ');
             hong.push(
-              `${path.relative(THU_MUC_API, tep).replace(/\\/g, '/')} · ` +
+              `${path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/')} · ` +
                 `${tenBang}.${dongTu}({ ${c}: … }) KHÔNG tồn tại${gan ? ` — gần nhất: ${gan}` : ''}`,
             );
           }
@@ -238,7 +260,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
           if (!cots.has(c)) {
             const gan = [...cots].filter((x) => x.includes(c.split('_')[0])).slice(0, 2).join(', ');
             hong.push(
-              `${path.relative(THU_MUC_API, tep).replace(/\\/g, '/')} · ` +
+              `${path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/')} · ` +
                 `${tenBang}.${dongTu}(parsed.data) chứa khoá "${c}" KHÔNG tồn tại` +
                 `${gan ? ` — gần nhất: ${gan}` : ''}`,
             );
@@ -267,7 +289,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
     expect(chophep.size, 'không đọc được ràng buộc CHECK nào ⇒ test này vô nghĩa').toBeGreaterThan(5);
 
     const hong: string[] = [];
-    for (const tep of moiRoute(THU_MUC_API)) {
+    for (const tep of moiNoiGhi()) {
       const ma = fs.readFileSync(tep, 'utf8');
       // CHỈ lấy bảng route này GHI vào, không lấy bảng nó chỉ đọc.
       //
@@ -307,7 +329,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
           if (!tap) continue;
           const thua = giaTri.filter((v) => !tap.has(v));
           const thieu = [...tap].filter((v) => !giaTri.includes(v));
-          const ten = path.relative(THU_MUC_API, tep).replace(/\\/g, '/');
+          const ten = path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/');
           if (thua.length > 0) {
             hong.push(
               `${ten} · ${b}.${cot}: mã cho phép ${thua.map((x) => `'${x}'`).join(', ')} ` +
@@ -334,7 +356,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
 
   it('3. mọi .select(danh sách cột) đều trỏ tới cột CÓ THẬT', () => {
     const hong: string[] = [];
-    for (const tep of moiRoute(THU_MUC_API)) {
+    for (const tep of moiNoiGhi()) {
       const ma = fs.readFileSync(tep, 'utf8');
       for (const m of ma.matchAll(/\.from\('(\w+)'\)\s*\n?\s*\.select\('([^']*)'\)/g)) {
         const [, tenBang, dsCot] = m;
@@ -347,7 +369,7 @@ describe('Mã phải khớp lược đồ CSDL', () => {
           if (!/^\w+$/.test(c)) continue;
           if (!cots.has(c)) {
             hong.push(
-              `${path.relative(THU_MUC_API, tep).replace(/\\/g, '/')} · ${tenBang}.select('… ${c} …') KHÔNG tồn tại`,
+              `${path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/')} · ${tenBang}.select('… ${c} …') KHÔNG tồn tại`,
             );
           }
         }
