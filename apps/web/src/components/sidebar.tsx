@@ -10,6 +10,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { TenantSwitcher } from './tenant-switcher';
+import { ViecCuaBan } from './viec-cua-ban';
 
 type SidebarProps = {
   /** Pre-extracted sidebar inner HTML (rewritten so nav-it divs are <a>). */
@@ -60,6 +61,9 @@ export function Sidebar({ html }: SidebarProps) {
           lệnh chairman 20/09/2026. Trước đây nó ở thanh trên cùng và cái mũi
           tên xuống chỉ là hình vẽ, bấm không mở gì. */}
       <TenantSwitcher />
+      {/* Việc đúng vai người đang dùng, nằm TRƯỚC menu đầy đủ. Không giấu mục
+          nào — menu 51 trang vẫn nguyên bên dưới. */}
+      <ViecCuaBan />
       <div className="nav-noi-dung" dangerouslySetInnerHTML={{ __html: html }} />
     </aside>
   );

@@ -697,3 +697,72 @@ body {
   /* giữ trắng vì nằm trên khối nền đậm, KHÔNG đổi — ghi ra đây để lần sau
      không ai "sửa nhầm cho đồng bộ". */
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+   "VIỆC CỦA BẠN" — khối theo vai ở đầu thanh bên.
+   Mỗi mục kèm MỘT CÂU vì sao vai đó cần nhìn thứ đó trước; người mới vào hiểu
+   công việc chứ không chỉ thấy cái menu.
+   ──────────────────────────────────────────────────────────────────────── */
+.zi-viec {
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--w6);
+  flex-shrink: 0;
+}
+.zi-viec-dau {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-family: var(--fm);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--m-chu-mo));
+}
+.zi-viec-dau b {
+  color: rgb(var(--m-nhan-sang));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.zi-viec ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.zi-viec-muc {
+  display: block;
+  padding: 6px 9px;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  text-decoration: none;
+  transition: background 0.16s, border-color 0.16s;
+}
+.zi-viec-muc:hover {
+  background: var(--w4);
+}
+.zi-viec-muc.zi-dang-xem {
+  background: rgb(var(--m-nhan) / 0.1);
+  border-left-color: rgb(var(--m-nhan));
+}
+.zi-viec-ten {
+  display: block;
+  font-size: 0.79rem;
+  font-weight: 500;
+  color: rgb(var(--m-chu));
+  line-height: 1.3;
+}
+.zi-viec-vi-sao {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.64rem;
+  line-height: 1.35;
+  color: rgb(var(--m-chu-mo));
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
