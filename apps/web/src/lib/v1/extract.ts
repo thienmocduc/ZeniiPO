@@ -458,6 +458,16 @@ export function rewriteSidebarForNextLinks(
     // API /api/canvas có từ lâu nhưng trước lần này KHÔNG trang nào gọi tới,
     // nên doanh nghiệp vào ZeniIPO không có đường đóng khung mô hình của mình.
     { route: 'bmc', page: 'bmc', ic: '▦', tx: 'Mô hình kinh doanh', pill: '<span class="pill new">BƯỚC 1</span>' },
+    // Kế hoạch tài chính — cửa vào engine ba báo cáo. Trước lần này /api/plan,
+    // /api/plan/run và /api/plan/publish KHÔNG có dòng giao diện nào gọi tới,
+    // nên trên production `plan_versions` = 0: engine chưa chạy thật lần nào
+    // và hợp đồng ba tầng gửi ZeniOS/ZeniERP chưa có gì để gửi.
+    { route: 'plan', page: 'plan', ic: '▤', tx: 'Kế hoạch tài chính', pill: '<span class="pill new">3 BÁO CÁO</span>' },
+    // Hai trang này có chức năng thật (xuất nhật ký kiểm toán, đổi mật khẩu &
+    // xác thực hai bước) nhưng KHÔNG có href nào trỏ tới — người dùng chỉ vào
+    // được nếu gõ tay URL.
+    { route: 'audit-log', page: 'auditlog', ic: '☰', tx: 'Nhật ký kiểm toán', pill: '' },
+    { route: 'settings-security', page: 'secset', ic: '⚿', tx: 'Bảo mật tài khoản', pill: '' },
     { route: 'financial-model', page: 'finmodel', ic: '∿', tx: 'Financial Model', pill: '<span class="pill">MC</span>' },
     { route: 'certificates', page: 'certs', ic: '🎓', tx: 'Chứng nhận', pill: '' },
   ]
