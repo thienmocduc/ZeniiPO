@@ -6,33 +6,74 @@ const config: Config = {
   content: ['./src/**/*.{ts,tsx,js,jsx,mdx}'],
   theme: {
     extend: {
+      // ─────────────────────────────────────────────────────────────────
+      // BẢNG MÀU "KIM KHỐ" — tài chính tư nhân × công nghệ (20/09/2026)
+      //
+      // Chairman: nền tảng phục vụ khách doanh nghiệp 100% nên phải đẳng cấp,
+      // màu đúng kiểu tài chính và công nghệ của tương lai.
+      //
+      // Bản cũ chạy bảng màu "luân xa": xanh lá #22c55e, lơ #06b6d4, chàm
+      // #6366f1, tím #a855f7 — bốn màu rực nằm cạnh nhau. Đó là bảng màu của
+      // ứng dụng tiêu dùng, không phải của nơi người ta mở bảng cổ phần và số
+      // liệu tài chính. Nay theo đúng lối phòng khách ngân hàng tư nhân:
+      //
+      //   · MỘT điểm nhấn xa xỉ  → vàng champagne. Dùng dè, chỉ cho thứ quan
+      //     trọng nhất trên màn hình. Vàng mà rải khắp nơi thì hết sang.
+      //   · Chiều sâu           → lam sapphire, thay cho tím/chàm.
+      //   · Chữ phụ             → bạch kim (xám ngả lam), cảm giác kim loại.
+      //   · Dữ liệu, liên kết   → MỘT tông lam kỹ thuật, sạch và lạnh.
+      //   · Trạng thái          → giảm độ rực: bảng số liệu tài chính mà xanh
+      //     đỏ neon thì nhìn như trò chơi.
+      // ─────────────────────────────────────────────────────────────────
       colors: {
-        bg: '#05070C',
-        'bg-2': '#0B0F1A',
-        panel: { DEFAULT: '#10182A', 2: '#151F36' },
-        ink: { DEFAULT: '#E3E7EF', 2: '#B8BECC', dim: '#6B7282', mute: '#4B5161' },
-        ivory: '#F5F1E8',
-        gold: { DEFAULT: '#C9A84C', light: '#E4C16E', dark: '#8B7834' },
-        // Chakra 6 · Ajna (third eye · indigo/deep blue-violet)
-        // Chakra 7 · Sahasrara (crown · violet→white→gold)
+        bg: '#06070B',
+        'bg-2': '#0A0D14',
+        panel: { DEFAULT: '#0E131D', 2: '#141A26' },
+        ink: { DEFAULT: '#E8ECF2', 2: '#A8B3C2', dim: '#6A7382', mute: '#484F5C' },
+        ivory: '#F4F1EA',
+
+        // Điểm nhấn xa xỉ duy nhất.
+        gold: { DEFAULT: '#C9A84C', light: '#DFC584', dark: '#8B7834' },
+
+        // Chiều sâu — thay cho chàm/tím.
+        sapphire: { DEFAULT: '#1B3A5C', deep: '#102439', light: '#2E5C8A' },
+
+        // Kim loại — chữ phụ, đường viền nhấn.
+        platinum: { DEFAULT: '#9AAAB8', dim: '#6E7C8A' },
+
+        // Lam kỹ thuật — dữ liệu, liên kết, trạng thái đang chạy.
+        tech: { DEFAULT: '#5B9BD5', dim: '#3E6E99' },
+
+        // Tầng thông tin: bốn tông cùng họ, không còn cầu vồng.
+        layer: { 1: '#C9A84C', 2: '#5B9BD5', 3: '#9AAAB8', 4: '#57C48F', 5: '#DDB05C' },
+
+        /**
+         * @deprecated Tên cũ theo "luân xa". KHÔNG dùng cho chỗ mới — hãy dùng
+         * `sapphire` / `gold` / `tech`.
+         * Vẫn giữ vì 8 tệp đang dùng lớp `chakra-6` / `chakra-7`; gỡ thẳng thì
+         * Tailwind lặng lẽ bỏ qua lớp không khai và giao diện mất màu mà không
+         * báo gì. Nay trỏ sang bảng màu mới nên những chỗ đó tự đổi theo.
+         */
         chakra: {
           6: {
-            DEFAULT: '#4f46e5', // indigo-600 · primary Ajna
-            deep: '#312e81',    // indigo-900
-            glow: '#6366f1',    // indigo-500
-            light: '#818cf8',   // indigo-400
+            DEFAULT: '#2E5C8A', // sapphire.light
+            deep: '#102439',
+            glow: '#5B9BD5',
+            light: '#9AAAB8',
           },
           7: {
-            DEFAULT: '#a855f7', // purple-500 · primary Sahasrara
-            violet: '#c084fc',  // purple-400
-            crown: '#f5f1e8',   // ivory-crown
-            gold: '#e4c16e',    // gold-crown
+            DEFAULT: '#C9A84C', // gold
+            violet: '#DFC584',
+            crown: '#F4F1EA',
+            gold: '#DFC584',
           },
         },
-        layer: { 1: '#E4C16E', 2: '#a855f7', 3: '#06b6d4', 4: '#4ade80', 5: '#fb923c' },
-        ok: '#4ade80',
-        warn: '#fbbf24',
-        err: '#f87171',
+
+        // Trạng thái — đã giảm rực cho hợp bảng số liệu.
+        ok: '#57C48F',
+        warn: '#DDB05C',
+        err: '#DC8080',
+
         w: {
           4: 'rgba(255,255,255,.04)',
           6: 'rgba(255,255,255,.06)',

@@ -40,6 +40,47 @@ html {
   --fs: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   BẢNG MÀU "KIM KHỐ" — ghi đè bảng màu luân xa của bản dựng V1.
+
+   Bản dựng khai --c4 xanh lá #22c55e, --c5 lơ #06b6d4, --c6 chàm #6366f1,
+   --c7 tím #a855f7 — bốn màu rực cạnh nhau, và bốn quả cầu mờ 500px dùng
+   chính những màu đó, độ mờ .28, lại còn TRÔI ĐỘNG 24 giây một vòng.
+   Đó là nền của ứng dụng tiêu dùng. Khách của ZeniIPO là doanh nghiệp mở
+   bảng cổ phần và số liệu tài chính — nền phải đứng yên và kín tiếng.
+
+   Ghi đè ở đây, không sửa source.html (tệp 6700 dòng, sửa tay là lần sau
+   nhập bản mới mất sạch).
+   ──────────────────────────────────────────────────────────────────────── */
+:root,
+:root .app,
+.cosmic {
+  --bg: #06070b;
+  --ink: #e8ecf2;
+  --gold: #c9a84c;
+  /* Bốn tông nay cùng một họ lạnh, không còn cầu vồng. */
+  --c4: #c9a84c; /* vàng champagne  */
+  --c5: #1b3a5c; /* lam sapphire    */
+  --c6: #2e5c8a; /* lam sapphire nhạt */
+  --c7: #9aaab8; /* bạch kim        */
+}
+
+/* Nền: hai vầng sáng rất nhạt, ĐỨNG YÊN. Nền có chuyển động thì mắt người
+   dùng bị kéo khỏi con số — thứ họ vào đây để đọc. */
+.cosmic .orb {
+  opacity: 0.07 !important;
+  filter: blur(130px) !important;
+  animation: none !important;
+}
+.cosmic .orb-4 {
+  opacity: 0.09 !important;
+}
+/* Giữ lại hai quả, giấu hai quả — bốn vầng sáng là quá nhiều cho một nền. */
+.cosmic .orb-6,
+.cosmic .orb-7 {
+  display: none !important;
+}
+
 body {
   font-family: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
   font-variant-numeric: tabular-nums lining-nums;
