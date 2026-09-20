@@ -16,6 +16,7 @@
 
 // ── Mã COA dùng trong engine (khớp plan_coa_lines) ──
 export const COA = {
+  // ── Tài khoản LÃI LỖ (5xx · 6xx · 7xx · 8xx) ──
   REV_GOODS: '5111',
   REV_SERVICE: '5113',
   DEDUCTION: '521',
@@ -24,12 +25,44 @@ export const COA = {
   OPEX_MARKETING: '6417',
   OPEX_GA_PEOPLE: '6421',
   OPEX_GA_RENT: '6427',
+  /** Chi phí khấu hao TSCĐ — hạch toán vào chi phí quản lý doanh nghiệp. */
+  DEPRECIATION: '6424',
   FIN_COST: '635',
   FIN_INCOME: '515',
   OTHER_INCOME: '711',
   OTHER_COST: '811',
   TAX: '821',
+
+  // ── Tài khoản BẢNG CÂN ĐỐI (1xx · 2xx · 3xx · 4xx) ──
+  //
+  // VÌ SAO PHẢI CÓ. Bản trước chỉ khai tài khoản lãi lỗ. Một mô hình không có
+  // bảng cân đối thì KHÔNG PHẢI mô hình tài chính — nó là bản chiếu doanh thu:
+  // không tính đúng vốn lưu động, không lập được lưu chuyển tiền tệ theo phương
+  // pháp gián tiếp (thứ kiểm toán và ngân hàng đầu tư mặc định đòi), và không
+  // có phép thử sơ đẳng nhất — tài sản = nợ phải trả + vốn chủ sở hữu.
+  CASH: '111',              // Tiền
+  AR: '131',                // Phải thu khách hàng
+  INVENTORY: '156',         // Hàng hoá
+  FIXED_ASSETS: '211',      // TSCĐ hữu hình — NGUYÊN GIÁ
+  ACC_DEPRECIATION: '214',  // Hao mòn luỹ kế — tài khoản GIẢM TRỪ tài sản
+  AP: '331',                // Phải trả người bán
+  TAX_PAYABLE: '3334',      // Thuế TNDN phải nộp
+  PAID_IN_CAPITAL: '411',   // Vốn góp của chủ sở hữu
+  RETAINED_EARNINGS: '421', // Lợi nhuận sau thuế chưa phân phối
 } as const
+
+/**
+ * Các mã BẢNG CÂN ĐỐI engine tự sinh số dư cuối tháng.
+ *
+ * Tách riêng khỏi `COA` để chỗ đẩy chỉ tiêu biết chính xác mã nào là SỐ DƯ
+ * (lấy tháng cuối kỳ) chứ không phải SỐ PHÁT SINH (cộng dồn cả kỳ). Nhầm hai
+ * loại này là cộng 12 lần số dư tiền mặt rồi báo cáo ra con số không tồn tại.
+ */
+export const COA_CAN_DOI = [
+  COA.CASH, COA.AR, COA.INVENTORY,
+  COA.FIXED_ASSETS, COA.ACC_DEPRECIATION,
+  COA.AP, COA.PAID_IN_CAPITAL, COA.RETAINED_EARNINGS,
+] as const
 
 const REVENUE_CODES = new Set<string>([COA.REV_GOODS, COA.REV_SERVICE])
 const OPEX_SALES_CODES = new Set<string>([COA.OPEX_SALES_PEOPLE, COA.OPEX_MARKETING])
@@ -64,6 +97,23 @@ export type PlanInput = {
   /** Góp vốn theo tháng (1-based) */
   equity_in?: Array<{ month: number; amount_vnd: number }>
   capex?: Array<{ month: number; amount_vnd: number }>
+  /**
+   * Số năm khấu hao tài sản cố định, đường thẳng. Mặc định 5.
+   *
+   * VÌ SAO BẮT BUỘC CÓ. Bản trước chi capex nhưng KHÔNG khấu hao: tài sản cố
+   * định không bao giờ giảm, và thuế bị tính THỪA vì thiếu lá chắn khấu hao.
+   * Khấu hao bắt đầu từ THÁNG SAU tháng mua — theo thông lệ mô hình tháng; tài
+   * sản mua giữa tháng không khấu hao nửa tháng đầu.
+   */
+  depreciation_years?: number
+  /**
+   * Vốn chủ sở hữu đầu kỳ. Mặc định bằng tiền đầu kỳ.
+   *
+   * Không có nó thì bảng cân đối KHÔNG CÂN: tiền đầu kỳ phải đến từ đâu đó —
+   * hoặc vốn góp, hoặc lợi nhuận để lại. Mặc định "tiền đầu kỳ là vốn góp" là
+   * giả định đơn giản nhất và đúng với doanh nghiệp mới lập.
+   */
+  opening_equity_vnd?: number
   /** Thuế TNDN — lấy từ bảng tax_rates, KHÔNG hardcode */
   tax_rate_pct: number
   /** Hệ số kịch bản áp lên các driver tăng trưởng/giá/khối lượng */
@@ -82,6 +132,10 @@ export type MonthRow = {
   opex_sales: number
   opex_ga: number
   ebitda: number
+  /** Khấu hao trong kỳ — chi phí KHÔNG bằng tiền. */
+  depreciation: number
+  /** EBIT = EBITDA − khấu hao. Trước đây thiếu, nên EBITDA bị dùng thay EBIT. */
+  ebit: number
   fin_cost: number
   fin_income: number
   other_income: number
@@ -98,6 +152,24 @@ export type MonthRow = {
   equity_in: number
   capex: number
   cash: number
+
+  // ── BẢNG CÂN ĐỐI KẾ TOÁN cuối kỳ ──
+  /** Nguyên giá TSCĐ luỹ kế. */
+  fixed_assets_gross: number
+  /** Hao mòn luỹ kế. */
+  acc_depreciation: number
+  /** Giá trị còn lại của TSCĐ = nguyên giá − hao mòn luỹ kế. */
+  fixed_assets_net: number
+  /** TỔNG TÀI SẢN = tiền + phải thu + tồn kho + TSCĐ còn lại. */
+  total_assets: number
+  /** TỔNG NỢ PHẢI TRẢ = phải trả người bán + thuế phải nộp. */
+  total_liabilities: number
+  /** Vốn góp luỹ kế = vốn đầu kỳ + góp thêm. */
+  paid_in_capital: number
+  /** Lợi nhuận sau thuế chưa phân phối, cộng dồn. */
+  retained_earnings: number
+  /** TỔNG VỐN CHỦ SỞ HỮU. */
+  total_equity: number
 }
 
 export type EngineResult = {
@@ -304,6 +376,32 @@ export function runPlanEngine(input: PlanInput, scenario: Scenario = 'base'): En
   let cash = vnd(openingCash)
   let prevWc = 0
 
+  // ── Khấu hao đường thẳng, bắt đầu từ THÁNG SAU tháng mua ──
+  const soNamKhauHao = Math.max(1, input.depreciation_years ?? 5)
+  const soThangKhauHao = Math.round(soNamKhauHao * 12)
+  /** Khấu hao phát sinh từng tháng, cộng dồn từ mọi lần mua tài sản. */
+  const khauHaoThang: number[] = new Array(horizon).fill(0)
+  for (const [thangMua, tien] of capexMap.entries()) {
+    const moiThang = vnd(tien / soThangKhauHao)
+    // Nguyên giá thường KHÔNG chia hết cho số tháng (240tr/36 = 6.666.666,67đ).
+    // Trích đều rồi làm tròn từng tháng thì tổng vượt nguyên giá vài đồng, tức
+    // giá trị còn lại ÂM — vô nghĩa. Sổ tài sản cố định thật xử lý bằng cách
+    // cho tháng CUỐI kỳ gánh phần dư, nên tổng trích luôn bằng đúng nguyên giá.
+    let conLai = tien
+    for (let k = 0; k < soThangKhauHao; k++) {
+      const idx = thangMua - 1 + 1 + k // tháng mua là 1-based; khấu hao từ tháng kế
+      const trich = k === soThangKhauHao - 1 ? conLai : Math.min(moiThang, conLai)
+      if (idx >= horizon) break // hết tầm nhìn: phần chưa trích nằm ngoài kỳ báo cáo
+      khauHaoThang[idx] += trich
+      conLai -= trich
+    }
+  }
+
+  let fixedGross = 0
+  let accDep = 0
+  let paidIn = vnd(input.opening_equity_vnd ?? openingCash)
+  let retained = 0
+
   for (let m = 0; m < horizon; m++) {
     const byCoa: Record<string, number> = {}
     for (const line of input.lines) {
@@ -329,8 +427,15 @@ export function runPlanEngine(input: PlanInput, scenario: Scenario = 'base'): En
     const grossProfit = netRevenue - cogs
     // EBITDA = revenue − 521 − 632 − 641x − 642x  (theo spec)
     const ebitda = revenue - deductions - cogs - opexSales - opexGa
-    // EBT = EBITDA − 635 + 515 + 711 − 811
-    const ebt = ebitda - finCost + finIncome + otherIncome - otherCost
+    // Khấu hao (6424) — chi phí KHÔNG bằng tiền, nằm dưới EBITDA theo định nghĩa.
+    const depreciation = khauHaoThang[m] ?? 0
+    if (depreciation > 0) byCoa[COA.DEPRECIATION] = depreciation
+    const ebit = ebitda - depreciation
+    // EBT = EBIT − 635 + 515 + 711 − 811
+    //
+    // BẢN TRƯỚC TÍNH TỪ EBITDA, tức bỏ qua khấu hao ⇒ thuế bị tính THỪA vì
+    // thiếu lá chắn khấu hao, và "EBITDA" bị dùng thay cho EBIT.
+    const ebt = ebit - finCost + finIncome + otherIncome - otherCost
     // Thuế 821 = max(0, EBT) × thuế suất (cấu hình, không hardcode)
     const tax = vnd(Math.max(0, ebt) * (taxRate / 100))
     const netIncome = ebt - tax
@@ -344,23 +449,57 @@ export function runPlanEngine(input: PlanInput, scenario: Scenario = 'base'): En
     const deltaWc = wc - prevWc
     prevWc = wc
 
-    // Dòng tiền gián tiếp: WC tăng = tiền bị giam → trừ khỏi dòng tiền.
-    const cfOperating = netIncome - deltaWc
+    // LƯU CHUYỂN TIỀN TỆ — PHƯƠNG PHÁP GIÁN TIẾP.
+    // Đi từ lợi nhuận sau thuế, CỘNG LẠI khoản chi không bằng tiền (khấu hao),
+    // rồi trừ phần vốn lưu động bị giam. Bản trước thiếu vế cộng lại khấu hao,
+    // nên dòng tiền bị báo thấp hơn thực tế đúng bằng số khấu hao.
+    const cfOperating = netIncome + depreciation - deltaWc
     const equityIn = equityMap.get(m + 1) ?? 0
     const capex = capexMap.get(m + 1) ?? 0
     const cashOpen = cash
     cash = cashOpen + cfOperating + equityIn - capex
+
+    // ── Bảng cân đối kế toán cuối kỳ ──
+    fixedGross += capex
+    accDep += depreciation
+    paidIn += equityIn
+    retained += netIncome
+    const fixedNet = fixedGross - accDep
+    const totalAssets = cash + ar + inventory + fixedNet
+    // Thuế giả định NỘP NGAY trong kỳ (đã trừ vào dòng tiền), nên không còn dư
+    // nợ thuế cuối kỳ. Muốn mô phỏng nộp theo quý thì thêm độ trễ nộp thuế —
+    // ghi ra đây để không ai tưởng là đã mô phỏng.
+    const taxPayable = 0
+    const totalLiabilities = ap + taxPayable
+    const totalEquity = paidIn + retained
+
+    byCoa[COA.CASH] = cash
+    byCoa[COA.AR] = ar
+    byCoa[COA.INVENTORY] = inventory
+    byCoa[COA.FIXED_ASSETS] = fixedGross
+    byCoa[COA.ACC_DEPRECIATION] = accDep
+    byCoa[COA.AP] = ap
+    byCoa[COA.PAID_IN_CAPITAL] = paidIn
+    byCoa[COA.RETAINED_EARNINGS] = retained
 
     months.push({
       month: m + 1,
       period: periodOf(start, m),
       by_coa: byCoa,
       revenue, deductions, net_revenue: netRevenue, cogs, gross_profit: grossProfit,
-      opex_sales: opexSales, opex_ga: opexGa, ebitda,
+      opex_sales: opexSales, opex_ga: opexGa, ebitda, depreciation, ebit,
       fin_cost: finCost, fin_income: finIncome, other_income: otherIncome, other_cost: otherCost,
       ebt, tax, net_income: netIncome,
       ar, inventory, ap, working_capital: wc, delta_wc: deltaWc,
       cf_operating: cfOperating, equity_in: equityIn, capex, cash,
+      fixed_assets_gross: fixedGross,
+      acc_depreciation: accDep,
+      fixed_assets_net: fixedNet,
+      total_assets: totalAssets,
+      total_liabilities: totalLiabilities,
+      paid_in_capital: paidIn,
+      retained_earnings: retained,
+      total_equity: totalEquity,
     })
   }
 
@@ -370,6 +509,37 @@ export function runPlanEngine(input: PlanInput, scenario: Scenario = 'base'): En
       if (!Number.isInteger(v)) throw new Error(`Bất biến vỡ: COA ${k} tháng ${r.month} không phải số nguyên (${v})`)
     }
     if (!Number.isInteger(r.cash)) throw new Error(`Bất biến vỡ: cash tháng ${r.month} không phải số nguyên`)
+  }
+
+  // ── Bất biến 2: BẢNG CÂN ĐỐI PHẢI CÂN, mọi kỳ ──
+  //
+  // Đây là phép thử sơ đẳng nhất của một mô hình tài chính, và là thứ đầu tiên
+  // kiểm toán viên hay ngân hàng đầu tư kiểm. Lệch một đồng là mô hình sai ở
+  // đâu đó — nên NÉM LỖI, không cảnh báo. Cảnh báo thì người ta bỏ qua.
+  //
+  // Sai số cho phép: 0 đồng. Mọi con số đều là số nguyên VND nên không có lý do
+  // gì để lệch; nếu lệch thì là lỗi logic chứ không phải lỗi làm tròn.
+  for (const r of months) {
+    const lech = r.total_assets - (r.total_liabilities + r.total_equity)
+    if (lech !== 0) {
+      throw new Error(
+        `Bất biến vỡ — BẢNG CÂN ĐỐI KHÔNG CÂN ở tháng ${r.month} (${r.period}): ` +
+          `tài sản ${r.total_assets} ≠ nợ ${r.total_liabilities} + vốn chủ ${r.total_equity}, ` +
+          `lệch ${lech} đồng. Kiểm lại: tiền ${r.cash} · phải thu ${r.ar} · tồn kho ${r.inventory} · ` +
+          `TSCĐ còn lại ${r.fixed_assets_net} | phải trả ${r.ap} | vốn góp ${r.paid_in_capital} · ` +
+          `lợi nhuận giữ lại ${r.retained_earnings}`,
+      )
+    }
+  }
+
+  // ── Bất biến 3: hao mòn luỹ kế KHÔNG vượt nguyên giá ──
+  // Khấu hao quá nguyên giá là tài sản có giá trị còn lại ÂM — vô nghĩa.
+  for (const r of months) {
+    if (r.acc_depreciation > r.fixed_assets_gross) {
+      throw new Error(
+        `Bất biến vỡ: tháng ${r.month} hao mòn luỹ kế ${r.acc_depreciation} vượt nguyên giá ${r.fixed_assets_gross}`,
+      )
+    }
   }
   // ── Bất biến 2: cash liên tục (cuối m = đầu m+1) ──
   for (let i = 1; i < months.length; i++) {
@@ -542,8 +712,23 @@ export function toPlanTargets(input: PlanInput, result: EngineResult): PlanTarge
       const key = `${line.company_id ?? ''}|${line.coa_line}`
       acc.set(key, (acc.get(key) ?? 0) + perLine.get(line.line_id)![m])
     }
-    // Thuế do engine tính (không phải dòng nhập) — gắn cấp tập đoàn.
+    // ── Các khoản ENGINE TỰ TÍNH (không phải dòng người dùng nhập) ──
+    // Gắn cấp tập đoàn (company_id = null) vì chúng sinh ra từ mô hình hợp
+    // nhất, không quy được về một công ty con cụ thể.
     if (row.tax !== 0) acc.set(`|${COA.TAX}`, (acc.get(`|${COA.TAX}`) ?? 0) + row.tax)
+    // Khấu hao: ERP sẽ báo số thực trên 6424. Không đẩy chỉ tiêu 6424 sang thì
+    // mọi đồng khấu hao thực tế đều hiện là "vượt dự toán" trên khoản mà kế
+    // hoạch chưa từng bỏ sót.
+    if (row.depreciation !== 0)
+      acc.set(`|${COA.DEPRECIATION}`, (acc.get(`|${COA.DEPRECIATION}`) ?? 0) + row.depreciation)
+    // Số dư BẢNG CÂN ĐỐI cuối tháng. ⚠ Đây là số DƯ, không phải số phát sinh —
+    // cộng dồn nhiều tháng là vô nghĩa. Bên tiêu thụ phân biệt bằng cột
+    // `statement` của `plan_coa_lines` (migration 035), hợp đồng
+    // /api/internal/plan-targets trả kèm cột đó.
+    for (const ma of COA_CAN_DOI) {
+      const soDu = row.by_coa[ma] ?? 0
+      if (soDu !== 0) acc.set(`|${ma}`, (acc.get(`|${ma}`) ?? 0) + soDu)
+    }
 
     for (const [key, amount] of acc) {
       if (amount === 0) continue

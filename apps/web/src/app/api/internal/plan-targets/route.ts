@@ -103,6 +103,30 @@ export async function GET(req: Request) {
     .order('coa_line', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // ── Gắn LOẠI BÁO CÁO cho từng mã ──
+  // Kế hoạch nay gồm cả ba báo cáo. Dòng 'pnl' là SỐ PHÁT SINH trong tháng
+  // (cộng 12 tháng ra số năm); dòng 'bs' là SỐ DƯ CUỐI THÁNG (cộng dồn là vô
+  // nghĩa — phải lấy tháng cuối kỳ). Trả mã trần không kèm loại thì bên gọi
+  // không có cách nào biết, và sẽ cộng số dư tiền mặt 12 lần.
+  const { data: coaRows, error: coaErr } = await sb
+    .from('plan_coa_lines')
+    .select('code, statement, label_vi')
+  if (coaErr) return NextResponse.json({ error: coaErr.message }, { status: 500 })
+  const loaiTheoMa = new Map((coaRows ?? []).map((c) => [c.code, c]))
+
+  // Fail-closed: mã không tra được loại thì KHÔNG đoán là 'pnl'. Trả về với
+  // statement = null để bên gọi tự chặn, hơn là để nó cộng nhầm.
+  const rowsCoLoai = (rows ?? []).map((r) => {
+    const coa = r.coa_line ? loaiTheoMa.get(r.coa_line) : undefined
+    return {
+      ...r,
+      statement: coa?.statement ?? null,
+      label_vi: coa?.label_vi ?? null,
+      /** true = số dư cuối kỳ, CẤM cộng dồn nhiều tháng. */
+      is_balance: coa?.statement === 'bs',
+    }
+  })
+
   return NextResponse.json({
     data: {
       tenant: tenant.slug,
@@ -114,8 +138,13 @@ export async function GET(req: Request) {
       currency: 'VND',
       // Ràng buộc #5: mọi số kèm nhãn nguồn
       source: `plan:v${version.version_no}`,
-      rows: rows ?? [],
-      count: rows?.length ?? 0,
+      // Quy ước đọc số, ghi thẳng vào payload để bên gọi không phải đoán.
+      doc_so: {
+        pnl: 'số PHÁT SINH trong tháng — cộng 12 tháng ra số năm',
+        bs: 'số DƯ cuối tháng — KHÔNG cộng dồn, lấy tháng cuối kỳ',
+      },
+      rows: rowsCoLoai,
+      count: rowsCoLoai.length,
     },
   })
 }
