@@ -206,8 +206,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Không tìm thấy thư mục migrations trong image.' }, { status: 500 });
   }
 
-  const { getPool } = await import('@/lib/zeni/db');
-  const pool = getPool();
+  // Migration cần quyền TẠO BẢNG ⇒ phải chạy bằng VAI CHỦ, không phải vai chạy
+  // hằng ngày. Từ 20/09/2026 ứng dụng nối bằng `zeniipo_com_runtime` (không sở
+  // hữu bảng, để RLS có hiệu lực), nên ở đây phải mở kết nối riêng bằng
+  // DATABASE_URL_MIGRATION. Thiếu biến đó thì lùi về DATABASE_URL — khi ấy
+  // migration sẽ báo lỗi quyền, và báo lỗi rõ vẫn tốt hơn là âm thầm chạy
+  // ứng dụng bằng vai chủ (mất sạch RLS).
+  const { chuoiKetNoiMigration } = await import('@/lib/zeni/db');
+  const { Pool } = await import('pg');
+  const chuoi = chuoiKetNoiMigration()!;
+  const pool = new Pool({
+    connectionString: chuoi,
+    max: 2,
+    ssl: chuoi.includes('/cloudsql/') || chuoi.includes('localhost')
+      ? undefined
+      : { rejectUnauthorized: false },
+  });
   const report: Array<{ file: string; ok: boolean; ms: number; error?: string }> = [];
   let aborted = false;
 
@@ -231,6 +245,10 @@ export async function POST(req: NextRequest) {
       aborted = true; // thứ tự là bắt buộc — dừng, không chạy lệch nền
     }
   }
+
+  // Đây là pool riêng mở bằng vai chủ — đóng lại ngay, đừng để nó sống tiếp
+  // trong tiến trình cùng với pool của vai chạy.
+  await pool.end().catch(() => {});
 
   const okCount = report.filter((r) => r.ok).length;
   return NextResponse.json({

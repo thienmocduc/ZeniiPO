@@ -15,6 +15,25 @@ export function hasDatabase(): boolean {
   return !!process.env.DATABASE_URL;
 }
 
+/**
+ * HAI VAI, HAI VIỆC (Zeni Cloud cấp 20/09/2026 — cách B):
+ *
+ *   DATABASE_URL            → `zeniipo_com_runtime`, KHÔNG sở hữu bảng.
+ *                             Ứng dụng chạy hằng ngày dùng vai này. Vì không
+ *                             sở hữu bảng nên Postgres MỚI áp RLS — hàng rào
+ *                             giữa các công ty nằm ở tầng CSDL, không phải ở
+ *                             tầng mã ứng dụng.
+ *   DATABASE_URL_MIGRATION  → `zeniipo_com_app`, chủ schema. CHỈ dùng để chạy
+ *                             migration / db-setup (cần quyền tạo bảng).
+ *
+ * Trước 20/09 ứng dụng nối bằng chính vai CHỦ ⇒ Postgres bỏ qua toàn bộ RLS,
+ * và cách ly giữa 9 công ty chỉ còn dựa vào mã ứng dụng. Một truy vấn quên
+ * điều kiện tenant là lộ chéo. Đừng bao giờ trỏ DATABASE_URL về vai chủ nữa.
+ */
+export function chuoiKetNoiMigration(): string | undefined {
+  return process.env.DATABASE_URL_MIGRATION ?? process.env.DATABASE_URL;
+}
+
 function makePool(): Pool {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
