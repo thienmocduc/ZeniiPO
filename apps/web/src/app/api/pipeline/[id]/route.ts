@@ -1,14 +1,22 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SoTien } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
 import { safeString, safeUuid } from '@/lib/security/schemas'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+/**
+ * ⚠ `check_size` KHÔNG phải cột của `investor_pipeline` — cột thật là
+ * `target_check_usd`. Bản cũ đẩy thẳng `parsed.data` vào UPDATE nên mọi lần
+ * sửa quy mô khoản đầu tư đều trả lỗi 500.
+ */
 const UpdateSchema = z.object({
   stage: safeString.optional(),
-  check_size: z.number().optional(),
+  /** Quy mô khoản dự kiến, ĐÔ LA NGUYÊN (cột CSDL là bigint). */
+  target_check_usd: SoTien.optional(),
+  committed_usd: SoTien.optional(),
   notes: safeString.optional(),
   investor_name: safeString.min(1).optional(),
 })

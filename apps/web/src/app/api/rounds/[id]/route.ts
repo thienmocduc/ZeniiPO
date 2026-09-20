@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SoTienDuong } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
 import { safeString, safeUuid } from '@/lib/security/schemas'
 import { notifyRoundClosed } from '@/lib/notify/slack'
@@ -7,14 +8,30 @@ import { notifyRoundClosed } from '@/lib/notify/slack'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const STATUSES = ['planning', 'outreach', 'dd', 'term_sheet', 'closing', 'closed'] as const
+/**
+ * ⚠ NĂM THỨ SAI, endpoint này chưa bao giờ sửa được một vòng gọi vốn nào:
+ *   name                → round_name
+ *   target_amount       → target_raise_usd
+ *   pre_money_valuation → pre_money_usd
+ *   expected_close_at   → target_close_date
+ * và tập trạng thái cũ ('dd', 'closing') KHÔNG có trong ràng buộc của CSDL,
+ * trong khi 'negotiating', 'due_diligence', 'signed', 'wired', 'failed' thì
+ * không cách nào đặt được. Danh sách dưới chép đúng ràng buộc
+ * `fundraise_rounds_status_check`.
+ */
+const STATUSES = [
+  'planning', 'outreach', 'negotiating', 'term_sheet',
+  'due_diligence', 'signed', 'wired', 'closed', 'failed',
+] as const
 
 const UpdateSchema = z.object({
-  name: safeString.min(1).optional(),
+  round_name: safeString.min(1).optional(),
   status: z.enum(STATUSES).optional(),
-  target_amount: z.number().positive().optional(),
-  pre_money_valuation: z.number().positive().optional(),
-  expected_close_at: safeString.optional(),
+  /** ĐÔ LA NGUYÊN (cột CSDL là bigint). */
+  target_raise_usd: SoTienDuong.optional(),
+  pre_money_usd: SoTienDuong.optional(),
+  /** Ngày dự kiến chốt, dạng YYYY-MM-DD. */
+  target_close_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày dạng YYYY-MM-DD').optional(),
 })
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -54,6 +54,32 @@ function cotThatCuaBang(): Map<string, Set<string>> {
   return bang;
 }
 
+/**
+ * Đọc ràng buộc `CHECK (cot IN ('a','b',...))` từ migration
+ * → { "bảng.cột": tập giá trị CSDL cho phép }.
+ *
+ * Bắt cả hai lối viết Postgres dùng: `IN ('a','b')` và `= ANY (ARRAY[...])`.
+ */
+function giaTriChoPhep(): Map<string, Set<string>> {
+  const ra = new Map<string, Set<string>>();
+  if (!fs.existsSync(THU_MUC_SQL)) return ra;
+
+  for (const f of fs.readdirSync(THU_MUC_SQL).filter((x) => x.endsWith('.sql')).sort()) {
+    const sql = fs.readFileSync(path.join(THU_MUC_SQL, f), 'utf8');
+    for (const m of sql.matchAll(
+      /CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(([\s\S]*?)\n\);/g,
+    )) {
+      const ten = m[1];
+      for (const c of m[2].matchAll(/\b(\w+)\s+IN\s*\(([^)]*)\)/g)) {
+        const tap = new Set<string>();
+        for (const v of c[2].matchAll(/'([^']*)'/g)) tap.add(v[1]);
+        if (tap.size > 0) ra.set(`${ten}.${c[1]}`, tap);
+      }
+    }
+  }
+  return ra;
+}
+
 /** Mọi tệp route.ts dưới src/app/api. */
 function moiRoute(dir: string, ra: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -171,9 +197,9 @@ describe('Mã phải khớp lược đồ CSDL', () => {
       }
 
       for (const m of ma.matchAll(
-        /\.from\('(\w+)'\)\s*\n?\s*\.(insert|upsert)\(\s*\{([\s\S]*?)\n\s*\}/g,
+        /\.from\('(\w+)'\)\s*\n?\s*\.(insert|upsert|update)\(\s*\{([\s\S]*?)\n\s*\}/g,
       )) {
-        const [, tenBang, , than] = m;
+        const [, tenBang, dongTu, than] = m;
         const cots = bang.get(tenBang);
         if (!cots) continue;
 
@@ -190,7 +216,31 @@ describe('Mã phải khớp lược đồ CSDL', () => {
             const gan = [...cots].filter((x) => x.includes(c.split('_')[0])).slice(0, 2).join(', ');
             hong.push(
               `${path.relative(THU_MUC_API, tep).replace(/\\/g, '/')} · ` +
-                `${tenBang}.insert({ ${c}: … }) KHÔNG tồn tại${gan ? ` — gần nhất: ${gan}` : ''}`,
+                `${tenBang}.${dongTu}({ ${c}: … }) KHÔNG tồn tại${gan ? ` — gần nhất: ${gan}` : ''}`,
+            );
+          }
+        }
+      }
+
+      // ── Dạng KHÔNG có dấu ngoặc nhọn: `.update(parsed.data)` ──
+      // Bản trước chỉ soi đối tượng viết thẳng `{ ... }`, nên bỏ lọt hẳn kiểu
+      // đưa nguyên kết quả zod vào. Đó chính là chỗ lỗi `evidence_url` /
+      // `evidence_note` ở /api/readiness/criteria/[id] nằm im suốt: hai cột đó
+      // không có trên bảng, nên nộp bằng chứng luôn trả lỗi 500 — mà test cũ
+      // vẫn xanh vì không soi tới.
+      for (const m of ma.matchAll(
+        /\.from\('(\w+)'\)\s*\n?\s*\.(insert|upsert|update)\(\s*parsed\.data\s*\)/g,
+      )) {
+        const [, tenBang, dongTu] = m;
+        const cots = bang.get(tenBang);
+        if (!cots) continue;
+        for (const c of khoaZod) {
+          if (!cots.has(c)) {
+            const gan = [...cots].filter((x) => x.includes(c.split('_')[0])).slice(0, 2).join(', ');
+            hong.push(
+              `${path.relative(THU_MUC_API, tep).replace(/\\/g, '/')} · ` +
+                `${tenBang}.${dongTu}(parsed.data) chứa khoá "${c}" KHÔNG tồn tại` +
+                `${gan ? ` — gần nhất: ${gan}` : ''}`,
             );
           }
         }
@@ -200,6 +250,83 @@ describe('Mã phải khớp lược đồ CSDL', () => {
     expect(
       hong,
       `\n${hong.length} khoá ghi vào cột không tồn tại ⇒ endpoint KHÔNG BAO GIỜ ghi được:\n  ` +
+        hong.join('\n  ') +
+        '\n',
+    ).toEqual([]);
+  });
+
+  it('5. mọi z.enum(...) đều nằm TRONG tập giá trị CSDL cho phép', () => {
+    // ⚠ LỚP LỖI THỨ SÁU, phát hiện 20/09/2026 ở `/api/rounds/[id]`: mã cho
+    // phép trạng thái 'dd' và 'closing' mà ràng buộc CSDL KHÔNG có hai giá
+    // trị đó ⇒ người dùng chọn xong thì nhận lỗi 500; đồng thời 'negotiating',
+    // 'due_diligence', 'signed', 'wired', 'failed' có trong CSDL nhưng mã
+    // không cho chọn ⇒ năm trạng thái không cách nào đặt được.
+    //
+    // TypeScript không bắt được vì hai bên là hai chuỗi rời nhau.
+    const chophep = giaTriChoPhep();
+    expect(chophep.size, 'không đọc được ràng buộc CHECK nào ⇒ test này vô nghĩa').toBeGreaterThan(5);
+
+    const hong: string[] = [];
+    for (const tep of moiRoute(THU_MUC_API)) {
+      const ma = fs.readFileSync(tep, 'utf8');
+      // CHỈ lấy bảng route này GHI vào, không lấy bảng nó chỉ đọc.
+      //
+      // Bản đầu lấy mọi `.from('...')` và báo nhầm ngay: `org/route.ts` ghi
+      // `status` xuống `org_positions` nhưng có ĐỌC `ipo_journeys` ở chỗ khác,
+      // nên test ghép nhầm hai thứ rồi tố một lỗi không tồn tại. Test báo
+      // nhầm thì người ta sẽ tắt nó đi — thà soi hẹp mà đúng.
+      const cacBang = [
+        ...new Set(
+          [...ma.matchAll(/\.from\('(\w+)'\)\s*\n?\s*\.(?:insert|upsert|update)\(/g)].map((m) => m[1]),
+        ),
+      ];
+      if (cacBang.length === 0) continue;
+
+      for (const m of ma.matchAll(/(\w+):\s*z\.enum\(([A-Z_]\w*|\[[^\]]*\])\)/g)) {
+        const [, cot, nguon] = m;
+        // z.enum(TEN_HANG) → tìm mảng hằng khai trong cùng tệp.
+        let danhSach = nguon;
+        if (!nguon.startsWith('[')) {
+          // ⚠ KHÔNG dựng regex bằng template literal ở đây. `\s` trong template
+          // literal bị JavaScript nuốt mất dấu thoát thành `s`, nên biểu thức
+          // ra `consts+STATUSESs*=s*` và KHÔNG BAO GIỜ khớp — test vẫn xanh
+          // trong khi chẳng soi được gì. (Đã dính đúng bẫy này một lần: đảo
+          // lỗi thật trở lại mà test vẫn xanh.) Cắt chuỗi thủ công cho chắc.
+          const dau = ma.indexOf(`const ${nguon} =`);
+          if (dau < 0) continue;
+          const mo = ma.indexOf('[', dau);
+          const dong = ma.indexOf(']', mo);
+          if (mo < 0 || dong < 0) continue;
+          danhSach = ma.slice(mo, dong + 1);
+        }
+        const giaTri = [...danhSach.matchAll(/'([^']*)'/g)].map((x) => x[1]);
+        if (giaTri.length === 0) continue;
+
+        for (const b of cacBang) {
+          const tap = chophep.get(`${b}.${cot}`);
+          if (!tap) continue;
+          const thua = giaTri.filter((v) => !tap.has(v));
+          const thieu = [...tap].filter((v) => !giaTri.includes(v));
+          const ten = path.relative(THU_MUC_API, tep).replace(/\\/g, '/');
+          if (thua.length > 0) {
+            hong.push(
+              `${ten} · ${b}.${cot}: mã cho phép ${thua.map((x) => `'${x}'`).join(', ')} ` +
+                `mà CSDL TỪ CHỐI (CSDL chỉ nhận: ${[...tap].join(', ')})`,
+            );
+          }
+          if (thieu.length > 0) {
+            hong.push(
+              `${ten} · ${b}.${cot}: CSDL có ${thieu.map((x) => `'${x}'`).join(', ')} ` +
+                `nhưng mã KHÔNG cho chọn ⇒ không cách nào đặt được`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(
+      hong,
+      `\n${hong.length} chỗ tập giá trị trong mã LỆCH với ràng buộc CSDL:\n  ` +
         hong.join('\n  ') +
         '\n',
     ).toEqual([]);

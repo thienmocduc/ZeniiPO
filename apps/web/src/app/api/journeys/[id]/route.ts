@@ -6,10 +6,18 @@ import { safeString, safeUuid } from '@/lib/security/schemas'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+/**
+ * ⚠ `title` KHÔNG phải cột của `ipo_journeys` — cột tên là `name`. Bản cũ khai
+ * cả hai rồi đẩy thẳng `parsed.data` vào UPDATE, nên ai gửi `title` là nhận
+ * lỗi 500 từ CSDL. Và `status` nhận chuỗi bất kỳ trong khi bảng có ràng buộc
+ * chỉ cho bốn giá trị — gửi giá trị khác cũng đổ ở CSDL chứ không được báo
+ * lỗi tử tế ở cửa vào.
+ */
+const TRANG_THAI_HANH_TRINH = ['active', 'paused', 'completed', 'abandoned'] as const
+
 const UpdateSchema = z.object({
-  title: safeString.min(1).optional(),
   name: safeString.min(1).optional(),
-  status: safeString.min(1).optional(),
+  status: z.enum(TRANG_THAI_HANH_TRINH).optional(),
 })
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

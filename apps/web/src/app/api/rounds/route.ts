@@ -8,7 +8,15 @@ import { safeString } from '@/lib/security/schemas'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const STATUSES = ['planning', 'outreach', 'dd', 'term_sheet', 'closing', 'closed'] as const
+/**
+ * ⚠ Chép ĐÚNG ràng buộc `fundraise_rounds_status_check` của CSDL. Bản cũ dùng
+ * 'dd' và 'closing' — hai giá trị CSDL từ chối — trong khi 'negotiating',
+ * 'due_diligence', 'signed', 'wired', 'failed' thì không cách nào đặt được.
+ */
+const STATUSES = [
+  'planning', 'outreach', 'negotiating', 'term_sheet',
+  'due_diligence', 'signed', 'wired', 'closed', 'failed',
+] as const
 
 /**
  * Tên trường KHỚP ĐÚNG cột của bảng `fundraise_rounds`.
