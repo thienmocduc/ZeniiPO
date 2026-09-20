@@ -1,0 +1,43 @@
+{
+  "_doc": [
+    "LỊCH CHẠY ĐỊNH KỲ — nguồn sự thật DUY NHẤT cho các tác vụ nền của ZeniIPO.",
+    "",
+    "Trước file này, lịch nằm trong `vercel.json` → `crons`. Ứng dụng đã chuyển sang",
+    "ZeniCloud (zeniipo.com trả `Server: railway-hikari`, không header x-vercel-*), nên",
+    "khối đó KHÔNG BAO GIỜ chạy nữa — cả bốn tác vụ đều chết âm thầm. Bằng chứng:",
+    "`agent_schedules` và `agent_runs` đều 0 dòng dù bộ chạy đã viết đủ từ lâu.",
+    "",
+    "Đăng ký bằng: node scripts/dang-ky-lich.mjs",
+    "Xác thực: mỗi lần gọi mang `Authorization: Bearer $CRON_SECRET` (đã nạp vào biến",
+    "môi trường của dự án zeniipo trên ZeniCloud). KHÔNG dựa vào header nền tảng."
+  ],
+  "goc": "https://zeniipo.com",
+  "mui_gio": "Asia/Ho_Chi_Minh",
+  "cong_viec": [
+    {
+      "ten": "zeniipo-agent-tick",
+      "duong_dan": "/api/cron/agents",
+      "lich": "*/15 * * * *",
+      "mo_ta": "Nhịp đập bộ máy agent — chạy các lịch đến hạn, tối đa 6 mỗi nhịp",
+      "ghi_chu": "CHƯA TỪNG được đăng ký ở đâu: vercel.json chỉ có 3 mục và thiếu hẳn mục này."
+    },
+    {
+      "ten": "zeniipo-readiness-recalc",
+      "duong_dan": "/api/cron/readiness-recalc",
+      "lich": "0 21 * * *",
+      "mo_ta": "Tính lại điểm sẵn sàng IPO hằng ngày"
+    },
+    {
+      "ten": "zeniipo-audit-retention",
+      "duong_dan": "/api/cron/audit-retention",
+      "lich": "0 19 * * *",
+      "mo_ta": "Dọn nhật ký kiểm toán quá hạn lưu trữ"
+    },
+    {
+      "ten": "zeniipo-weekly-digest",
+      "duong_dan": "/api/cron/weekly-digest",
+      "lich": "0 1 * * 1",
+      "mo_ta": "Bản tin tuần gửi cho người dùng"
+    }
+  ]
+}
