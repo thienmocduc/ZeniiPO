@@ -54,8 +54,11 @@ export function ChuThuatNgu() {
     const daChu = new Set<string>();
     const daTao: HTMLElement[] = [];
 
-    // Đợi một nhịp cho phần nội dung do binder đổ vào kịp hiện ra.
-    const hen = window.setTimeout(() => {
+    /**
+     * Quét và chú nghĩa. Gọi lại được nhiều lần: `daChu` nhớ thuật ngữ đã chú
+     * nên lần sau chỉ xử phần nội dung mới.
+     */
+    const quet = () => {
       const diBo = document.createTreeWalker(goc, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
           const cha = node.parentElement;
@@ -106,10 +109,35 @@ export function ChuThuatNgu() {
         sau.parentNode?.replaceChild(boc, sau);
         daTao.push(boc);
       }
-    }, 450);
+    };
+
+    /**
+     * VÌ SAO THEO DÕI THAY ĐỔI, KHÔNG HẸN GIỜ CỨNG (sửa 20/09/2026):
+     * bản đầu chỉ hẹn 450ms rồi quét một lần. Nhưng nội dung trang do bộ đổ dữ
+     * liệu nạp về SAU đó — lúc quét thì vùng nội dung còn rỗng, nên không chú
+     * được chữ nào, và nó không bao giờ chạy lại. Đo trên bản chạy thật:
+     * `abbr.zi-tn` = 0. Nay quét lại mỗi khi nội dung đổi.
+     */
+    let hen: number | undefined;
+    const hoan = () => {
+      window.clearTimeout(hen);
+      hen = window.setTimeout(quet, 250);
+    };
+
+    hoan();
+    const theoDoi = new MutationObserver((thayDoi) => {
+      // Bỏ qua chính những thay đổi do mình vừa tạo ra, nếu không sẽ tự kích
+      // hoạt mình vô hạn.
+      const cuaNguoiKhac = thayDoi.some((t) =>
+        !(t.target instanceof Element && t.target.closest('abbr.zi-tn')),
+      );
+      if (cuaNguoiKhac) hoan();
+    });
+    theoDoi.observe(goc, { childList: true, subtree: true, characterData: true });
 
     return () => {
       window.clearTimeout(hen);
+      theoDoi.disconnect();
       // Dọn sạch khi rời trang: trả chữ về nguyên trạng, tránh chồng lớp chú
       // giải qua nhiều lần điều hướng.
       for (const el of daTao) {
