@@ -30,8 +30,8 @@ export async function GET() {
       supabase.rpc('get_journey_state', { p_tenant_id: tid }),
       supabase.from('ipo_journeys').select('id, name, current_phase, valuation_target, exit_venue, target_year, industry, north_star_metric')
         .eq('tenant_id', tid).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('readiness_score_history').select('total_score, breakdown_by_category, created_at')
-        .eq('tenant_id', tid).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('readiness_score_history').select('total_score, breakdown_by_category, captured_at')
+        .eq('tenant_id', tid).order('captured_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('financial_models').select('result, assumptions, created_at')
         .eq('tenant_id', tid).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('cap_table_snapshots').select('total_shares, holders, valuation_usd, created_at')

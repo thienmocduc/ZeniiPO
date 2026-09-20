@@ -18,7 +18,7 @@ export async function GET() {
   }
 
   const [profile, tenant, journey, kpis, tasks, events] = await Promise.all([
-    supabase.from('user_profiles').select('*').eq('user_id', user.id).maybeSingle(),
+    supabase.from('user_profiles').select('*').eq('id', user.id).maybeSingle(),
     supabase.from('tenants').select('*').eq('id', tenantId).maybeSingle(),
     supabase
       .from('ipo_journeys')
@@ -31,7 +31,7 @@ export async function GET() {
       .from('kpi_metrics')
       .select('*')
       .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false })
+      .order('captured_at', { ascending: false })
       .limit(4),
     supabase
       .from('tasks')

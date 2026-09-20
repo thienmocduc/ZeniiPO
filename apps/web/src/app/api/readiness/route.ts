@@ -28,7 +28,7 @@ export async function GET(req: Request) {
       .from('readiness_score_history')
       .select('*')
       .eq('journey_id', journeyId)
-      .order('created_at', { ascending: true }),
+      .order('captured_at', { ascending: true }),
     supabase.rpc('compute_readiness_score', { journey_id: journeyId }),
   ])
 

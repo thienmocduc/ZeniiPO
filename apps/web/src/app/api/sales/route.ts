@@ -22,7 +22,7 @@ export async function GET() {
       .limit(120),
     supabase
       .from('investor_pipeline')
-      .select('id, investor_name, stage, check_size, status, created_at')
+      .select('id, investor_name, stage, target_check_usd, committed_usd, created_at')
       .order('created_at', { ascending: false })
       .limit(50),
   ])

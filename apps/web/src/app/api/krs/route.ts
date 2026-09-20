@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     query = query.eq('objective_id', objectiveId)
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false })
+  const { data, error } = await query.order('due_date', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }

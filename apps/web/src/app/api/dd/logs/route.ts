@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     if (!idCheck.success) {
       return NextResponse.json({ error: 'Invalid access_id' }, { status: 400 })
     }
-    query = query.eq('access_id', accessId)
+    query = query.eq('investor_access_id', accessId)
   }
 
   const { data, error } = await query.order('created_at', { ascending: false }).limit(500)

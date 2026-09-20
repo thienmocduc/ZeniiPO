@@ -63,7 +63,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('dd_investor_access')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('access_granted_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }

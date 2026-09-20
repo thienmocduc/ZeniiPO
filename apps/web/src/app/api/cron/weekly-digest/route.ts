@@ -44,7 +44,7 @@ export async function GET(req: Request) {
       .select('id, email, full_name, role')
       .eq('tenant_id', t.id)
       .in('role', ['chr', 'ceo'])
-      .order('last_active_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle()
     if (!profile?.email) {
@@ -86,7 +86,7 @@ export async function GET(req: Request) {
       .from('readiness_score_history')
       .select('total_score')
       .eq('tenant_id', t.id)
-      .order('created_at', { ascending: false })
+      .order('captured_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 

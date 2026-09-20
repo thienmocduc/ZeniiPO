@@ -24,7 +24,7 @@ export async function GET() {
     .from('academy_progress')
     .select('*')
     .eq('user_id', user.id)
-    .order('updated_at', { ascending: false })
+    .order('started_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })

@@ -64,7 +64,7 @@ export async function GET() {
   const [profilesRes, journeysRes, subsRes, eventsRes, readinessRes, okrRes] = await Promise.all([
     svc.from('user_profiles').select('id, email, full_name, role, tenant_id, is_chairman_super, last_active_at, created_at'),
     svc.from('ipo_journeys').select('id, tenant_id, name, current_phase, target_year, valuation_target, status, created_at'),
-    svc.from('subscriptions').select('tenant_id, plan, status, tier_code, current_period_end'),
+    svc.from('subscriptions').select('tenant_id, plan, status, current_period_end'),
     svc.from('events').select('tenant_id, event_type, created_at').order('created_at', { ascending: false }).limit(400),
     svc.from('readiness_score_history').select('tenant_id, total_score, captured_at').order('captured_at', { ascending: false }),
     svc.from('okr_objectives').select('tenant_id'),

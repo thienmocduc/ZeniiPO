@@ -25,7 +25,7 @@ export async function GET() {
 
   const [configured, catalog, schedules, pendingActions, recentActions, recentRuns] =
     await Promise.all([
-      supabase.from('agents').select('*').order('created_at', { ascending: false }),
+      supabase.from('agents').select('*').order('name', { ascending: false }),
       supabase.from('agent_catalog').select('*').order('display_order', { ascending: true }),
       supabase
         .from('agent_schedules')

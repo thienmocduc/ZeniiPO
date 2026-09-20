@@ -31,7 +31,7 @@ export async function GET(req: Request) {
   if (metricCode) query = query.eq('metric_code', metricCode)
   if (period) query = query.eq('period', period)
 
-  const { data, error } = await query.order('created_at', { ascending: false })
+  const { data, error } = await query.order('captured_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }
