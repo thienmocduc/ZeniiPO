@@ -603,3 +603,97 @@ body {
   pointer-events: none;
   will-change: transform;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   VÁ MÀU MÃ CỨNG CỦA BẢN DỰNG V1
+
+   CSS bản dựng có 78 khai báo màu ghi thẳng mã (không qua biến). Chúng không
+   theo chế độ, nên ở chế độ sáng thì thanh bên, thanh trên, hộp thoại… vẫn ĐEN
+   trên nền ngọc trai. Đo trên bản chạy thật sau khi bật chế độ sáng:
+   `.nav` vẫn trả `rgba(3, 6, 15, 0.5)` — đúng loại "lỗi màu khi chuyển chế độ"
+   chairman cảnh báo.
+
+   Hai nhóm vá:
+   A. Bề mặt tối → theo chế độ sáng.
+   B. Tím/chàm còn sót — bảng màu mới chỉ đổi BIẾN, còn những chỗ ghi thẳng
+      rgba(168,85,247) / rgba(99,102,241) thì vẫn tím, vẫn chàm ở CẢ hai chế độ.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── B. Dọn tím/chàm còn sót (áp cho CẢ hai chế độ) ── */
+.app .okr-node,
+.app .kp,
+.app .kp-step,
+.app .pb-st,
+.app .pb-step {
+  background: var(--w4) !important;
+}
+.app .okr-node:hover,
+.app .kp-h:hover,
+.app .pb-st:hover,
+.app .pb-step:hover {
+  background: var(--w6) !important;
+}
+.app .pb-st.done,
+.app .pb-step.done {
+  background: var(--c4-g) !important;
+}
+.app .drill-c.elite {
+  color: var(--gold) !important;
+}
+.app .drill-c.rookie {
+  color: var(--c6) !important;
+}
+
+/* ── A. Bề mặt tối → chế độ sáng ── */
+:root[data-theme='sang'] .nav {
+  background: rgba(255, 255, 255, 0.74);
+}
+:root[data-theme='sang'] .tb {
+  background: rgba(255, 255, 255, 0.82);
+}
+:root[data-theme='sang'] .main .ph {
+  background: rgb(var(--m-nen) / 0.92);
+}
+:root[data-theme='sang'] .modal,
+:root[data-theme='sang'] .role-menu,
+:root[data-theme='sang'] .schema-t,
+:root[data-theme='sang'] .login-card,
+:root[data-theme='sang'] .tr-tip,
+:root[data-theme='sang'] .tr-done-card,
+:root[data-theme='sang'] .zi-tenant-menu {
+  background: #fff !important;
+}
+/* Lớp phủ sau hộp thoại: nền sáng thì phủ mực đậm, không phủ đen tuyền. */
+:root[data-theme='sang'] .modal-bg,
+:root[data-theme='sang'] .tr-ovl,
+:root[data-theme='sang'] .tr-done {
+  background: rgba(16, 23, 36, 0.42) !important;
+}
+:root[data-theme='sang'] .login {
+  background: rgba(244, 246, 250, 0.94);
+}
+:root[data-theme='sang'] select.login-input option {
+  background: #fff;
+  color: #101724;
+}
+/* Sao nền màu trắng — trên nền ngọc trai thì vô hình, chỉ tổ nặng trang. */
+:root[data-theme='sang'] .star {
+  display: none;
+}
+/* Bóng đổ ở chế độ sáng phải nhạt; bóng đen đặc trên nền trắng nhìn bẩn. */
+:root[data-theme='sang'] .kpi-card:hover,
+:root[data-theme='sang'] .schema-t:hover,
+:root[data-theme='sang'] .drill-c:hover,
+:root[data-theme='sang'] .modal,
+:root[data-theme='sang'] .role-menu,
+:root[data-theme='sang'] .flash {
+  box-shadow: var(--bong-the) !important;
+}
+/* Chữ trắng trên nền đã đổi sang trắng thì mất hút — trả về màu mực. */
+:root[data-theme='sang'] .kp-ic,
+:root[data-theme='sang'] .kp-step-n,
+:root[data-theme='sang'] .pb-complete-ic {
+  color: #fff;
+  /* giữ trắng vì nằm trên khối nền đậm, KHÔNG đổi — ghi ra đây để lần sau
+     không ai "sửa nhầm cho đồng bộ". */
+}
