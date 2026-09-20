@@ -186,7 +186,29 @@ export function getTopbarHtml(): string {
   const src = loadSource();
   const open = src.indexOf('<header class="tb">');
   const close = src.indexOf('</header>', open) + '</header>'.length;
-  _topbarCache = stripInlineHandlers(src.slice(open, close));
+  let tb = stripInlineHandlers(src.slice(open, close));
+
+  // GỠ ô chọn công ty khỏi thanh trên — nay nó nằm ở đầu THANH BÊN
+  // (`components/tenant-switcher.tsx`), theo lệnh chairman 20/09/2026.
+  //
+  // Khối này có div lồng nhau, nên KHÔNG đếm `</div>` kiểu lười — cách đó cắt
+  // sót giữa chừng (bài học 19/09: một biểu thức lười đã xoá nhầm cả nút Đăng
+  // nhập thật). Neo bằng lookahead tới mốc đứng NGAY SAU nó là ô tìm kiếm.
+  const truoc = tb;
+  tb = tb.replace(/<div class="entity-switch"[\s\S]*?(?=<div class="search">)/, '');
+
+  // Kiểm CẢ HAI chiều: thứ phải MẤT đã mất, và thứ phải CÒN vẫn còn.
+  // Chỉ kiểm "đã mất" là đúng cái lỗ hổng đã làm hỏng màn hình đăng nhập.
+  if (tb.includes('entity-switch')) {
+    throw new Error('[extract] Không gỡ được ô chọn công ty khỏi thanh trên — mẫu neo đã lệch.');
+  }
+  for (const phaiCon of ['class="search"', 'class="tb-r"', 'class="logo"', 'id="roleSw"']) {
+    if (!tb.includes(phaiCon)) {
+      throw new Error(`[extract] Cắt hỏng thanh trên: mất "${phaiCon}" (dài ${truoc.length} → ${tb.length}).`);
+    }
+  }
+
+  _topbarCache = tb;
   return _topbarCache;
 }
 

@@ -49,10 +49,11 @@ export function IdentityBind() {
         setText('#roleLabel', roleLabel + (tName ? ` · ${tName}` : ''))
         if (name) setText('#roleAv', name.trim()[0].toUpperCase())
 
-        // Tenant switcher chip (top-left)
-        setText('.entity-switch .labels b', tName)
-        setText('.entity-switch .labels span', `${plan} tenant`)
-        if (tName) setText('.entity-switch .icon', tName.trim()[0].toUpperCase())
+        // Ô chọn công ty KHÔNG còn ở thanh trên nữa (20/09/2026) — nó đã
+        // chuyển xuống đầu thanh bên và tự lấy dữ liệu qua
+        // `/api/tenants/switchable`. Bỏ ba dòng vá chữ ở đây, để lại thì chúng
+        // tìm phần tử không còn tồn tại và âm thầm không làm gì.
+        void plan
       } catch {
         /* leave static markup intact */
       }

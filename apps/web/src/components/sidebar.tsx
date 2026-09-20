@@ -9,6 +9,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { TenantSwitcher } from './tenant-switcher';
 
 type SidebarProps = {
   /** Pre-extracted sidebar inner HTML (rewritten so nav-it divs are <a>). */
@@ -54,11 +55,12 @@ export function Sidebar({ html }: SidebarProps) {
   }, [pathname, html]);
 
   return (
-    <aside
-      ref={ref}
-      className="nav"
-      id="sidebar"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <aside ref={ref} className="nav" id="sidebar">
+      {/* Ô chọn công ty nằm ĐẦU thanh bên, ngay trên "Bảng điều khiển" —
+          lệnh chairman 20/09/2026. Trước đây nó ở thanh trên cùng và cái mũi
+          tên xuống chỉ là hình vẽ, bấm không mở gì. */}
+      <TenantSwitcher />
+      <div className="nav-noi-dung" dangerouslySetInnerHTML={{ __html: html }} />
+    </aside>
   );
 }

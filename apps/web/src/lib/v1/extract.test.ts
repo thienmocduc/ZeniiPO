@@ -91,4 +91,17 @@ describe('Thanh trên', () => {
     expect(tb.length).toBeGreaterThan(50)
     expect(tb).toContain('tb-r') // chỗ nút Đăng xuất được chèn vào
   })
+
+  it('8. ô chọn công ty đã RỜI thanh trên — và thanh trên KHÔNG bị cắt hỏng', () => {
+    const tb = getTopbarHtml()
+
+    // Thứ phải MẤT: ô chọn công ty nay nằm ở đầu thanh bên.
+    expect(tb).not.toContain('entity-switch')
+
+    // ⚠ Và thứ phải CÒN. Bài học 19/09/2026: lần trước chỉ kiểm vế "đã mất"
+    // nên một biểu thức cắt lố đã xoá luôn nút Đăng nhập thật mà test vẫn xanh.
+    for (const phaiCon of ['class="logo"', 'class="search"', 'class="tb-r"', 'id="roleSw"']) {
+      expect(tb, `thanh trên mất "${phaiCon}" — biểu thức cắt đã lố`).toContain(phaiCon)
+    }
+  })
 })

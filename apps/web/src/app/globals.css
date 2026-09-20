@@ -83,7 +83,12 @@ html {
    ──────────────────────────────────────────────────────────────────────── */
 .app .main .ph {
   position: sticky;
-  top: 0;
+  /* -24px chứ KHÔNG phải 0: vị trí dính tính từ mép TRONG của vùng cuộn, mà
+     `.main` có đệm trên 24px — để `top: 0` thì thanh dừng thấp hơn thanh trên
+     cùng đúng 24px, và nội dung cuộn LỌT QUA khe đó (chairman bắt được
+     20/09/2026). Đo tại chỗ: đỉnh .main = 60, đỉnh thanh = 84 khi top:0;
+     đổi sang -24px thì cả hai cùng 60 — hai thanh liền nền. */
+  top: -24px;
   z-index: 40;
   align-items: center;
   flex-wrap: nowrap;
@@ -140,6 +145,7 @@ html {
   .app .main .ph {
     flex-wrap: wrap;
     gap: 8px;
+    top: -24px;
     margin: -24px -16px 16px;
     padding: 10px 16px;
   }
@@ -151,6 +157,135 @@ html {
     margin-left: 0;
     overflow-x: auto;
   }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Ô CHỌN CÔNG TY Ở ĐẦU THANH BÊN (lệnh chairman 20/09/2026)
+   Trước đây nằm trên thanh trên cùng, chen giữa logo và ô tìm kiếm, và mũi tên
+   xuống chỉ là hình vẽ — bấm không mở ra gì.
+   ──────────────────────────────────────────────────────────────────────── */
+.nav > .nav-noi-dung {
+  display: contents; /* giữ nguyên bố cục cũ của thanh bên, không thêm tầng */
+}
+
+.zi-tenant {
+  position: relative;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--w6);
+  flex-shrink: 0;
+}
+
+.zi-tenant-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--w8);
+  background: var(--w4);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+}
+.zi-tenant-btn:hover:not(:disabled) {
+  border-color: rgba(201, 168, 76, 0.45);
+  background: rgba(201, 168, 76, 0.07);
+}
+.zi-tenant-btn:disabled {
+  cursor: default;
+}
+
+.zi-tenant-ic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #c9a84c, #8b7834);
+  color: #06070b;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+.zi-tenant-ic.sm {
+  width: 22px;
+  height: 22px;
+  font-size: 0.7rem;
+}
+
+.zi-tenant-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.zi-tenant-txt b {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.zi-tenant-txt span {
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mute, #6a7382);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zi-xoay {
+  transform: rotate(180deg);
+  transition: transform 0.18s;
+}
+
+.zi-tenant-menu {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: calc(100% - 4px);
+  z-index: 60;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 340px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid var(--w12);
+  background: #0e131d;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+.zi-tenant-head {
+  padding: 8px 10px 6px;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mute, #6a7382);
+}
+.zi-tenant-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.zi-tenant-item:hover {
+  background: var(--w6);
+}
+.zi-tenant-item.zi-dang-xem {
+  color: #dfc584;
 }
 
 /* Nền: hai vầng sáng rất nhạt, ĐỨNG YÊN. Nền có chuyển động thì mắt người
