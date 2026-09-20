@@ -96,10 +96,10 @@ export function FinancialModelStudio() {
           </div>
         ) : (
           <>
-            {/* Runway radar */}
+            {/* Ra-đa số tháng sống */}
             <div className="rounded-xl border border-w8 bg-bg-2 p-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-medium text-ink">Runway radar</h2>
+                <h2 className="font-medium text-ink">Ra-đa số tháng sống</h2>
                 <span className="text-xs text-ink-dim">{result.trials} kịch bản · {result.horizon_months} tháng</span>
               </div>
               <div className="grid grid-cols-4 gap-3 text-center">

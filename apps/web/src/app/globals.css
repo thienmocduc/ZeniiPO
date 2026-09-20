@@ -16,12 +16,42 @@ html {
   height: auto !important;
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   MỘT PHÔNG DUY NHẤT: NOTO SANS (lệnh chairman 20/09/2026)
+
+   Trước đây giao diện chạy BỐN họ chữ cùng lúc — Fraunces cho tiêu đề,
+   Cormorant Garamond cho chữ nghiêng, Noto Sans cho thân bài, DM/JetBrains
+   Mono cho nhãn và CON SỐ. Nhìn lộn xộn, và nặng hơn là mỗi họ chữ vẽ chữ số
+   một kiểu nên cùng một bảng số lại không thẳng hàng với nhau.
+
+   Bản dựng V1 (`lib/v1/source.html`) tự khai bộ biến riêng --fb/--fd/--fm/--fs.
+   Ghi đè ở đây thay vì sửa thẳng vào source.html: sửa file bản dựng là gọt tay
+   một tệp 6700 dòng, lần sau nhập lại bản mới là mất sạch.
+
+   Chữ số dùng `tabular-nums`: mọi chữ số rộng bằng nhau nên cột tiền, cột phần
+   trăm thẳng hàng — đó là lý do trước đây phải dùng phông monospace cho số, nay
+   không cần nữa. `lining-nums` để không có chữ số thò lên thụt xuống.
+   ──────────────────────────────────────────────────────────────────────── */
+:root,
+:root .app {
+  --fb: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
+  --fd: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
+  --fm: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
+  --fs: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
+}
+
 body {
   font-family: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
   background: #05070C;
   color: #E3E7EF;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Bản dựng V1 gán font-family thẳng vào thẻ ở nhiều chỗ; kéo hết về một phông. */
+.app :where(h1, h2, h3, h4, h5, h6, .kpi-v, .kpi-l, .mono, code, pre, table, th, td) {
+  font-family: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
 }
 
 ::selection {

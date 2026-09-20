@@ -162,7 +162,7 @@ function Operator({ data }: { data: ConsoleData }) {
           <table className="w-full text-sm min-w-[760px]">
             <thead><tr className="text-left text-xs text-ink-dim border-b border-w8">
               <th className="py-2 pr-3 font-medium">Công ty</th><th className="py-2 px-3 font-medium">Gói</th><th className="py-2 px-3 font-medium">Owner</th>
-              <th className="py-2 px-3 font-medium text-right">Users</th><th className="py-2 px-3 font-medium text-right">Phase</th>
+              <th className="py-2 px-3 font-medium text-right">Người dùng</th><th className="py-2 px-3 font-medium text-right">Phase</th>
               <th className="py-2 px-3 font-medium text-right">Readiness</th><th className="py-2 px-3 font-medium">Tạo</th><th className="py-2 px-3 font-medium">Hoạt động</th>
             </tr></thead>
             <tbody>
@@ -196,7 +196,7 @@ function Operator({ data }: { data: ConsoleData }) {
           <div className="overflow-x-auto max-h-80 overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-bg-2"><tr className="text-left text-xs text-ink-dim border-b border-w8">
-                <th className="py-2 pr-3 font-medium">Email</th><th className="py-2 px-3 font-medium">Role</th><th className="py-2 px-3 font-medium">Tenant</th><th className="py-2 px-3 font-medium">Active</th>
+                <th className="py-2 pr-3 font-medium">Email</th><th className="py-2 px-3 font-medium">Role</th><th className="py-2 px-3 font-medium">Tenant</th><th className="py-2 px-3 font-medium">Đang hoạt động</th>
               </tr></thead>
               <tbody>
                 {users.map((u) => (
@@ -292,7 +292,7 @@ function Holdings({ data, reload }: { data: ConsoleData; reload: () => void }) {
             <thead><tr className="text-left text-xs text-ink-dim border-b border-w8">
               <th className="py-2 pr-3 font-medium">Công ty</th><th className="py-2 px-3 font-medium text-right">Phase</th>
               <th className="py-2 px-3 font-medium text-right">Readiness</th><th className="py-2 px-3 font-medium text-right">OKR</th>
-              <th className="py-2 px-3 font-medium text-right">Tiền mặt</th><th className="py-2 px-3 font-medium text-right">Runway</th><th className="py-2 px-3" />
+              <th className="py-2 px-3 font-medium text-right">Tiền mặt</th><th className="py-2 px-3 font-medium text-right">Số tháng sống</th><th className="py-2 px-3" />
             </tr></thead>
             <tbody>
               {holdings.subsidiaries.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-ink-dim italic">Chưa có công ty con. Dùng dropdown để gán.</td></tr>}

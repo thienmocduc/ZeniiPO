@@ -134,7 +134,7 @@ export function AuditLogViewer() {
             <thead>
               <tr className="border-b border-w8 text-xs uppercase tracking-wider text-ink-dim">
                 <th className="text-left px-4 py-2 font-normal">Thời gian</th>
-                <th className="text-left px-4 py-2 font-normal">Action</th>
+                <th className="text-left px-4 py-2 font-normal">Thao tác</th>
                 <th className="text-left px-4 py-2 font-normal">Bảng</th>
                 <th className="text-left px-4 py-2 font-normal">Target</th>
                 <th className="text-left px-4 py-2 font-normal">Actor</th>

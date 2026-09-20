@@ -425,7 +425,7 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
       const status = t.status ?? 'open'
       return `<tr><td><strong>${escapeHtml(t.title)}</strong></td><td>${escapeHtml(t.priority ?? '—')}</td><td>${due}</td><td><span class="st ${stClass(status)}">${escapeHtml(status)}</span></td></tr>`
     }).join('')
-    body.innerHTML = `<div class="card"><div class="card-h"><h3>Task list <em>· ${tasks.length} active</em></h3><span class="tag live">LIVE</span></div><table class="tbl"><thead><tr><th>Task</th><th>Priority</th><th>Due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    body.innerHTML = `<div class="card"><div class="card-h"><h3>Danh sách công việc <em>· ${tasks.length} việc đang mở</em></h3><span class="tag live">LIVE</span></div><table class="tbl"><thead><tr><th>Công việc</th><th>Mức ưu tiên</th><th>Hạn</th><th>Trạng thái</th></tr></thead><tbody>${rows}</tbody></table></div>`
   },
 
   'page-captable': (raw) => {

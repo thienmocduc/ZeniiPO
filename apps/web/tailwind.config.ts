@@ -41,11 +41,15 @@ const config: Config = {
           16: 'rgba(255,255,255,.16)',
         },
       },
+      // MỘT PHÔNG DUY NHẤT: Noto Sans (lệnh chairman 20/09/2026).
+      // Giữ nguyên bốn tên khoá vì hàng trăm chỗ đang dùng `font-display`,
+      // `font-serif`, `font-mono` — đổi tên khoá là phải sửa hết, đổi GIÁ TRỊ
+      // thì một chỗ là xong. Chúng nay chỉ còn khác nhau ở độ đậm/khoảng chữ.
       fontFamily: {
-        display: ['Fraunces', 'serif'],
-        serif: ['"Cormorant Garamond"', 'serif'],
-        sans: ['"Noto Sans"', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'monospace'],
+        display: ['"Noto Sans"', 'system-ui', 'sans-serif'],
+        serif: ['"Noto Sans"', 'system-ui', 'sans-serif'],
+        sans: ['"Noto Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"Noto Sans"', 'system-ui', 'sans-serif'],
       },
       fontSize: { '2xs': ['0.68rem', { lineHeight: '1.2' }] },
       letterSpacing: { widest: '0.25em', 'wider-plus': '0.3em' },

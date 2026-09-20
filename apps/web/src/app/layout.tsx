@@ -1,36 +1,29 @@
 import type { Metadata, Viewport } from 'next';
-import { Fraunces, Cormorant_Garamond, Noto_Sans, JetBrains_Mono } from 'next/font/google';
+import { Noto_Sans } from 'next/font/google';
 import './globals.css';
 import { getCss } from '@/lib/v1/extract';
 import { CosmosBg } from '@/components/cosmos-bg';
 
-const fraunces = Fraunces({
-  subsets: ['latin', 'vietnamese'],
-  variable: '--font-display',
-  display: 'swap',
-  weight: ['400', '500', '600', '700', '800', '900'],
-});
-
-const cormorant = Cormorant_Garamond({
-  subsets: ['latin', 'vietnamese'],
-  variable: '--font-serif',
-  display: 'swap',
-  weight: ['400', '500', '600', '700'],
-  style: ['normal', 'italic'],
-});
-
+/**
+ * MỘT PHÔNG DUY NHẤT CHO CẢ SẢN PHẨM — Noto Sans (lệnh chairman 20/09/2026).
+ *
+ * Trước đây nạp bốn họ chữ: Fraunces, Cormorant Garamond, Noto Sans,
+ * JetBrains Mono. Ba cái đầu tiên ngoài việc làm giao diện lộn xộn còn bắt
+ * người dùng tải thêm ba bộ phông — chậm trang mà chẳng để làm gì.
+ *
+ * Bốn biến CSS được giữ nguyên tên (`--font-display`, `--font-serif`,
+ * `--font-mono`) vì hàng trăm chỗ trong mã đang dùng; nay tất cả cùng trỏ vào
+ * Noto Sans. Chữ số thẳng hàng nhờ `tabular-nums` khai ở globals.css, không
+ * cần phông monospace nữa.
+ *
+ * Noto Sans có bộ chữ Việt đầy đủ (`subsets` có 'vietnamese') — dấu mũ, dấu
+ * móc, dấu thanh hiển thị đúng, không bị thay thế bằng phông dự phòng.
+ */
 const notoSans = Noto_Sans({
   subsets: ['latin', 'vietnamese'],
   variable: '--font-sans',
   display: 'swap',
-  weight: ['300', '400', '500', '600', '700', '800'],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin', 'vietnamese'],
-  variable: '--font-mono',
-  display: 'swap',
-  weight: ['400', '500', '600', '700'],
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
 });
 
 export const metadata: Metadata = {
@@ -103,7 +96,7 @@ export default function RootLayout({
   return (
     <html
       lang="vi"
-      className={`${fraunces.variable} ${cormorant.variable} ${notoSans.variable} ${jetbrainsMono.variable}`}
+      className={notoSans.variable}
     >
       <head>
         {/* v1_8_FULL.html CSS — byte-for-byte inherited */}
