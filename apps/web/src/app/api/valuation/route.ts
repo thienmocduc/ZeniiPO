@@ -11,7 +11,7 @@ export async function GET() {
   if (!auth.ok) {
     return NextResponse.json({ error: auth.message }, { status: auth.status })
   }
-  const [journey, snapshots, comps] = await Promise.all([
+  const [journey, snapshots, comps, dinhGia] = await Promise.all([
     supabase
       .from('ipo_journeys')
       .select('id, name, valuation_target, current_phase, target_year, exit_venue')
@@ -31,12 +31,35 @@ export async function GET() {
       .eq('tenant_id', auth.tenantId)
       .order('updated_at', { ascending: false })
       .limit(20),
+    // Các lần chạy định giá KÈM trạng thái phê duyệt.
+    //
+    // Trước đây `/api/valuation/run` ghi vào `valuation_runs` nhưng KHÔNG route
+    // nào đọc bảng đó ra — chạy xong thì con số rơi vào CSDL rồi không ai nhìn
+    // thấy lại. Và dấu vết phê duyệt (migration 039) cũng chưa có đường nào
+    // phơi ra: cơ chế kiểm soát mà không ai thấy thì không kiểm soát được gì.
+    supabase
+      .from('dinh_gia_kem_phe_duyet')
+      .select(
+        'id, method, enterprise_value_usd, equity_value_usd, nguoi_chay, chay_luc, ' +
+          'trang_thai_duyet, giai_thich, nguoi_duyet, duyet_luc',
+      )
+      .eq('tenant_id', auth.tenantId)
+      .order('chay_luc', { ascending: false })
+      .limit(20),
   ])
   return NextResponse.json({
     data: {
       journey: journey.data,
       cap_history: snapshots.data ?? [],
       comparables: comps.data ?? [],
+      dinh_gia: dinhGia.data ?? [],
+      // Đếm sẵn để giao diện không phải tự lọc — và để con số "bao nhiêu lần
+      // định giá chưa ai duyệt" đập vào mắt thay vì nằm im trong danh sách.
+      dinh_gia_tom_tat: {
+        tong: (dinhGia.data ?? []).length,
+        chua_duyet: (dinhGia.data ?? []).filter((x) => x.trang_thai_duyet === 'chua_duyet').length,
+        het_hieu_luc: (dinhGia.data ?? []).filter((x) => x.trang_thai_duyet === 'het_hieu_luc').length,
+      },
     },
   })
 }
