@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SoTienKhongAm } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
 import { requireUserAndTenant } from '@/lib/api/tenant'
 import { safeString } from '@/lib/security/schemas'
@@ -20,7 +21,7 @@ const PostSchema = z.object({
   holders: z.array(HolderSchema).min(1).max(100),
   snapshot_type: z.enum(['pre_round', 'post_round', 'monthly', 'yearly', 'adhoc']).default('adhoc'),
   origin: safeString.max(40).optional(),
-  valuation_usd: z.number().nonnegative().optional(),
+  valuation_usd: SoTienKhongAm.optional(),
 })
 
 export async function POST(req: Request) {

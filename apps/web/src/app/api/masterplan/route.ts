@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SoTien } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
 import { requireUserAndTenant } from '@/lib/api/tenant'
 
@@ -30,7 +31,8 @@ export async function GET() {
   return NextResponse.json({ data: { years: years.data ?? [], journey: journey.data?.[0] ?? null } })
 }
 
-const Money = z.number().finite().min(-1e15).max(1e15)
+/** So tien dung chung, bat buoc so nguyen (CSDL la bigint). */
+const Money = SoTien
 const PostSchema = z.object({
   year: z.number().int().min(2020).max(2060),
   phase: z.number().int().min(1).max(10).optional(),

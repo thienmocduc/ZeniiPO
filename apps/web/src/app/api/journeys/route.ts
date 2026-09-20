@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SoTienDuong } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/api/tenant'
 import { safeString } from '@/lib/security/schemas'
@@ -9,7 +10,7 @@ export const runtime = 'nodejs'
 
 const CreateSchema = z.object({
   name: safeString.min(1),
-  valuation_target: z.number().positive(),
+  valuation_target: SoTienDuong,
   exit_venue: safeString.min(1),
   target_year: z.number().int().min(2024).max(2100),
   industry: safeString.min(1),

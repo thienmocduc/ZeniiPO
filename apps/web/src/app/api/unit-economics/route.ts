@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SoTien } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
 import { requireUserAndTenant } from '@/lib/api/tenant'
 
@@ -26,7 +27,8 @@ export async function GET() {
   return NextResponse.json({ data })
 }
 
-const Num = z.number().finite().min(-1e12).max(1e12)
+/** Nam cot MRR duoi day deu la TIEN => so nguyen (cot CSDL la bigint). */
+const Num = SoTien
 const PostSchema = z.object({
   period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'period dạng YYYY-MM'),
   new_customers: z.number().int().min(0).max(1e9).default(0),

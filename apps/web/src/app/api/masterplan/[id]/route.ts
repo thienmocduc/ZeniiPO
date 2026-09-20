@@ -1,11 +1,13 @@
 import { z } from 'zod'
+import { SoTien } from '@/lib/tien/so-tien'
 import { createCrudItemHandler } from '@/lib/api/crud'
 import { safeString } from '@/lib/security/schemas'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const Money = z.number().finite().min(-1e15).max(1e15)
+/** So tien dung chung, bat buoc so nguyen (CSDL la bigint). */
+const Money = SoTien
 const UpdateSchema = z.object({
   phase: z.number().int().min(1).max(10).optional(),
   revenue_target: Money.optional(),

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SoTienDuong } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/api/tenant'
 import { safeString } from '@/lib/security/schemas'
@@ -24,8 +25,8 @@ const CreateSchema = z.object({
   round_name: safeString.min(1),
   /** Mã vòng: seed, series_a… Dùng cho đối chiếu và sắp xếp. */
   round_code: safeString.min(1),
-  target_raise_usd: z.number().positive(),
-  pre_money_usd: z.number().positive().optional(),
+  target_raise_usd: SoTienDuong,
+  pre_money_usd: SoTienDuong.optional(),
   status: z.enum(STATUSES).optional(),
   /** Ngày dự kiến chốt vòng. */
   target_close_date: safeString.optional(),

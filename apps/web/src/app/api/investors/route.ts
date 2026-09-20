@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SoTien } from '@/lib/tien/so-tien'
 import { createCrudHandler } from '@/lib/api/crud'
 import { safeString } from '@/lib/security/schemas'
 
@@ -15,8 +16,8 @@ const Schema = z.object({
   contact_linkedin: safeString.optional(),
   stage: safeString.optional(),
   priority: safeString.optional(),
-  target_check_usd: z.number().optional(),
-  committed_usd: z.number().optional(),
+  target_check_usd: SoTien.optional(),
+  committed_usd: SoTien.optional(),
   probability_pct: z.number().optional(),
   next_action: safeString.optional(),
   next_action_date: safeString.optional(),

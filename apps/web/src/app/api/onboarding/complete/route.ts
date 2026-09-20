@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SoTienDuong } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
 import { requireUserAndTenant } from '@/lib/api/tenant'
 import { safeString } from '@/lib/security/schemas'
@@ -12,7 +13,7 @@ const Schema = z.object({
   journey_name: safeString.min(1).max(120),
   target_year: z.number().int().min(2026).max(2050),
   exit_venue: z.enum(['sgx', 'nasdaq', 'nyse', 'hkex', 'hose']),
-  valuation_target_usd: z.number().positive(),
+  valuation_target_usd: SoTienDuong,
   industry: safeString.max(80),
   north_star_metric: safeString.max(120),
   // Step 2: 4 KPIs

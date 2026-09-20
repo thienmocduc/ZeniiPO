@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SoTien } from '@/lib/tien/so-tien'
 import { createCrudHandler } from '@/lib/api/crud'
 import { safeString } from '@/lib/security/schemas'
 
@@ -11,10 +12,10 @@ const Schema = z.object({
   exchange: safeString.optional(),
   industry: safeString.optional(),
   region: safeString.optional(),
-  revenue_usd: z.number().optional(),
-  ebitda_usd: z.number().optional(),
-  market_cap_usd: z.number().optional(),
-  enterprise_value_usd: z.number().optional(),
+  revenue_usd: SoTien.optional(),
+  ebitda_usd: SoTien.optional(),
+  market_cap_usd: SoTien.optional(),
+  enterprise_value_usd: SoTien.optional(),
   ev_revenue_multiple: z.number().optional(),
   ev_ebitda_multiple: z.number().optional(),
   pe_ratio: z.number().optional(),
