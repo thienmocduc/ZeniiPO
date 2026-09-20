@@ -15,8 +15,25 @@ export const runtime = 'nodejs'
  */
 
 type Rows = Array<Record<string, unknown>>
-const safe = (r: { data: unknown; error: unknown }): Rows =>
-  r.error || !Array.isArray(r.data) ? [] : (r.data as Rows)
+/**
+ * Lấy dữ liệu, lỗi thì trả mảng rỗng — nhưng PHẢI GHI LẠI.
+ *
+ * Bản trước nuốt lỗi hoàn toàn. Hai truy vấn trong số này trỏ vào bảng KHÔNG
+ * TỒN TẠI (`modules`, `governance_docs`), nên hai cổng chấm điểm SOP và quản
+ * trị **luôn bằng 0** suốt từ ngày viết — mà không một dòng lỗi nào hiện ra.
+ * Hỏng âm thầm tệ hơn hỏng ồn ào: điểm sẵn sàng IPO thấp mà không ai biết vì
+ * sao thấp.
+ */
+const safe = (r: { data: unknown; error: unknown }, ten: string): Rows => {
+  if (r.error) {
+    console.error(
+      `[roadmap] cổng "${ten}" không đọc được dữ liệu ⇒ bị chấm 0 điểm:`,
+      (r.error as { message?: string })?.message ?? r.error,
+    )
+    return []
+  }
+  return Array.isArray(r.data) ? (r.data as Rows) : []
+}
 
 export async function GET() {
   const supabase = await createServerClient()
@@ -33,45 +50,50 @@ export async function GET() {
       supabase.from('market_intel').select('id').limit(10),
       supabase.from('financial_statements').select('period, revenue, cogs').order('created_at', { ascending: false }).limit(12),
       supabase.from('okr_objectives').select('id').limit(5),
-      supabase.from('modules').select('id').eq('category', 'sops').limit(3),
+      // Bảng `modules` KHÔNG tồn tại (tên thật là `modules_catalog`, và nó là
+      // danh mục module chứ không phải quy trình). Quy trình vận hành nằm ở
+      // `sop_processes` — đó mới là thứ cổng SOP phải đếm.
+      supabase.from('sop_processes').select('id').eq('status', 'active').limit(3),
       supabase.from('agent_schedules').select('id').eq('enabled', true).limit(3),
       supabase.from('user_profiles').select('id, role').in('role', ['chr', 'ceo', 'board', 'investor']).limit(20),
-      supabase.from('governance_docs').select('id').limit(3),
+      // `governance_docs` KHÔNG có trong lược đồ. Bằng chứng quản trị thật là
+      // nghị quyết hội đồng quản trị.
+      supabase.from('board_resolutions').select('id').limit(3),
       supabase.from('data_room_docs').select('id').limit(5),
       supabase.from('readiness_score_history').select('total_score, captured_at').order('captured_at', { ascending: false }).limit(1),
       supabase.from('fundraise_rounds').select('status, target_raise_usd').limit(20),
       supabase.from('kpi_metrics').select('metric_code, value, period').eq('category', 'finance_derived').order('captured_at', { ascending: false }).limit(20),
     ])
 
-  const specs = safe(specsR)
+  const specs = safe(specsR, 'giai đoạn hành trình')
   if (specsR.error || specs.length === 0) {
     return NextResponse.json(
       { error: specsR.error ? (specsR.error as { message?: string }).message : 'journey_phase_specs trống — apply migration 025' },
       { status: 500 },
     )
   }
-  const journey = safe(journeyR)[0] ?? null
+  const journey = safe(journeyR, 'hành trình')[0] ?? null
   const currentPhase = Number(journey?.current_phase ?? 1)
 
-  const canvasFilled = safe(canvasR).filter((b) => Array.isArray(b.items) && (b.items as unknown[]).length > 0).length
-  const councilRuns = safe(councilR).length
-  const mktTypes = new Set(safe(mktR).map((m) => m.metric_type as string))
-  const intelCount = safe(intelR).length
-  const finRows = safe(finR)
+  const canvasFilled = safe(canvasR, 'mô hình kinh doanh').filter((b) => Array.isArray(b.items) && (b.items as unknown[]).length > 0).length
+  const councilRuns = safe(councilR, 'hội đồng thẩm định').length
+  const mktTypes = new Set(safe(mktR, 'dữ liệu thị trường').map((m) => m.metric_type as string))
+  const intelCount = safe(intelR, 'tin tức thị trường').length
+  const finRows = safe(finR, 'báo cáo tài chính')
   const hasRevenue = finRows.some((f) => Number(f.revenue) > 0)
   const latestFin = finRows[0]
   const gmPositive = latestFin ? Number(latestFin.revenue) - Number(latestFin.cogs) > 0 && Number(latestFin.revenue) > 0 : false
-  const okrCount = safe(okrR).length
-  const sopCount = safe(sopR).length
-  const agentsOn = safe(schedR).length
-  const boardCount = safe(boardR).filter((b) => /board|chr/i.test(String(b.role))).length
-  const govCount = safe(govR).length
-  const vaultDocs = safe(vaultR).length
-  const readiness = Number(safe(readyR)[0]?.total_score ?? 0)
-  const rounds = safe(roundsR)
+  const okrCount = safe(okrR, 'mục tiêu OKR').length
+  const sopCount = safe(sopR, 'quy trình vận hành').length
+  const agentsOn = safe(schedR, 'lịch chạy trợ lý').length
+  const boardCount = safe(boardR, 'thành viên hội đồng').filter((b) => /board|chr/i.test(String(b.role))).length
+  const govCount = safe(govR, 'nghị quyết quản trị').length
+  const vaultDocs = safe(vaultR, 'phòng dữ liệu').length
+  const readiness = Number(safe(readyR, 'điểm sẵn sàng')[0]?.total_score ?? 0)
+  const rounds = safe(roundsR, 'vòng gọi vốn')
   const OPEN = ['planning', 'outreach', 'negotiating', 'term_sheet', 'due_diligence']
   const openRounds = rounds.filter((r) => OPEN.includes(String(r.status)))
-  const kpis = safe(kpiR)
+  const kpis = safe(kpiR, 'chỉ số tài chính')
   const kpiVal = (code: string) => {
     const row = kpis.find((k) => k.metric_code === code)
     return row ? Number(row.value) : null

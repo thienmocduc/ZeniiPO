@@ -66,12 +66,14 @@ export async function POST(req: Request) {
   const { data, error } = await supabase
     .from('cap_table_snapshots')
     .insert({
+      // Khớp đúng cột `cap_table_snapshots`. Bảng chỉ có MỘT cột định giá —
+      // ghi định giá SAU tiền (post-money), vì ảnh chụp cơ cấu sở hữu là trạng
+      // thái SAU khi vòng gọi vốn đã pha loãng; ghi trước tiền là mô tả một
+      // trạng thái không còn tồn tại nữa.
       tenant_id: tenantId,
       round_id: round.id,
-      pre_money_valuation: preMoney,
-      post_money_valuation: postMoney,
-      holdings: dilutedHoldings,
-      created_by: user.id,
+      valuation_usd: postMoney,
+      holders: dilutedHoldings,
     })
     .select()
     .single()

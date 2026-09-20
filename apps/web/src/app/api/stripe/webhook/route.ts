@@ -49,7 +49,10 @@ export async function POST(req: Request) {
             stripe_subscription_id: sub.id,
             stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : sub.customer.id,
             price_id: priceId,
-            tier_code: plan,
+            // `subscriptions` KHÔNG có cột `tier_code` — gói dịch vụ nằm ở cột
+            // `plan` ngay dưới. Ghi thừa một khoá lạ là Postgres từ chối CẢ
+            // câu lệnh, nên webhook thanh toán sẽ im lặng không cập nhật được
+            // trạng thái thuê bao.
             plan,
             status: sub.status,
             current_period_start: new Date(sub.current_period_start * 1000).toISOString(),

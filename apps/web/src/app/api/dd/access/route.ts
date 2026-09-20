@@ -37,14 +37,20 @@ export async function POST(req: Request) {
   const { data, error } = await supabase
     .from('dd_investor_access')
     .insert({
+      // Tên khoá KHỚP ĐÚNG cột `dd_investor_access`. Bản trước dùng
+      // investor_email / investor_name / nda_accepted / folder_scopes /
+      // expires_at / invited_by — KHÔNG cột nào tồn tại, nên cấp quyền xem
+      // phòng dữ liệu cho nhà đầu tư CHƯA BAO GIỜ chạy được.
       tenant_id: tenantId,
-      investor_email: parsed.data.investor_email,
-      investor_name: parsed.data.investor_name,
-      nda_accepted: parsed.data.nda_accepted ?? false,
-      folder_scopes: parsed.data.folder_scopes,
-      expires_at: parsed.data.expires_at,
+      invitee_email: parsed.data.investor_email,
+      invitee_name: parsed.data.investor_name,
+      // NDA lưu bằng MỐC THỜI GIAN ký, không phải cờ đúng/sai — hồ sơ pháp lý
+      // cần biết ký lúc nào, không chỉ biết đã ký.
+      nda_signed_at: parsed.data.nda_accepted ? new Date().toISOString() : null,
+      folder_scope: parsed.data.folder_scopes,
+      access_expires_at: parsed.data.expires_at,
       round_id: parsed.data.round_id,
-      invited_by: user.id,
+      created_by: user.id,
     })
     .select()
     .single()

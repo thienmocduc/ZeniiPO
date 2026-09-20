@@ -12,7 +12,7 @@ const CreateSchema = z.object({
   investor_name: safeString.min(1),
   contact_email: safeEmail.optional(),
   stage: safeString.optional(),
-  check_size: z.number().optional(),
+  target_check_usd: z.number().optional(),
   notes: safeString.optional(),
 })
 

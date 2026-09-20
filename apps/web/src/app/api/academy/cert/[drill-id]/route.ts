@@ -47,8 +47,9 @@ export async function POST(
         content_id: drillId,
         status: 'certified',
         progress_pct: 100,
+        // `academy_progress` không có cột `cert_issued_at`; mốc cấp chứng nhận
+        // chính là lúc hoàn thành.
         completed_at: new Date().toISOString(),
-        cert_issued_at: new Date().toISOString(),
       },
       { onConflict: 'user_id,content_type,content_id' },
     )

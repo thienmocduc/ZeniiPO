@@ -123,6 +123,88 @@ describe('Mã phải khớp lược đồ CSDL', () => {
     expect(hong, `\nLọc theo cột không tồn tại:\n  ${hong.join('\n  ')}\n`).toEqual([]);
   });
 
+  it('4. mọi khoá trong .insert()/.upsert() đều là cột CÓ THẬT', () => {
+    // ⚠ ĐÂY LÀ LỚP LỖI NẶNG NHẤT, và test cũ KHÔNG canh: bản rà 20/09/2026 tìm
+    // ra 26 khoá sai nằm ở 9 route — tất cả đều ở nhánh GHI, nghĩa là 9
+    // endpoint đó **chưa bao giờ tạo được một bản ghi nào**. Nặng nhất là
+    // `/api/rounds`: gửi name/round_type/target_amount/pre_money_valuation…
+    // trong khi bảng dùng round_name/round_code/target_raise_usd/pre_money_usd
+    // — không khoá nào trùng.
+    //
+    // Đọc chậm hơn `.order` vì phải lần cả `...parsed.data` (khoá lấy từ lược
+    // đồ zod khai trong cùng tệp), nhưng đó chính là dạng hay sai nhất.
+    const hong: string[] = [];
+
+    for (const tep of moiRoute(THU_MUC_API)) {
+      const ma = fs.readFileSync(tep, 'utf8');
+
+      /** Khoá ở TẦNG NGOÀI CÙNG của một thân đối tượng (bỏ qua khoá lồng). */
+      const khoaTangNgoai = (than: string): string[] => {
+        const ra: string[] = [];
+        let sau = 0;
+        for (const dong of than.split('\n')) {
+          const k = /^\s*(\w+)\s*:/.exec(dong);
+          if (k && sau === 0) ra.push(k[1]);
+          for (const c of dong) {
+            if (c === '{' || c === '[' || c === '(') sau++;
+            else if (c === '}' || c === ']' || c === ')') sau--;
+          }
+        }
+        return ra;
+      };
+
+      // Khoá do zod khai trong cùng tệp — dùng khi mã ghi `...parsed.data`.
+      //
+      // Hai điều kiện để không báo nhầm:
+      //  1. Soi đúng TẦNG NGOÀI — `steps: z.array(z.object({ no, action… }))`
+      //     thì `no`/`action` là dữ liệu trong cột jsonb, không phải tên cột.
+      //  2. CHỈ lấy lược đồ thật sự được đem đi phân tích (`X.safeParse`). Một
+      //     tệp thường khai nhiều lược đồ; gộp hết vào là lôi cả lược đồ con
+      //     (`StepSchema`) vào danh sách cột — đúng kiểu báo nhầm.
+      const luocDo = new Map<string, string[]>();
+      for (const z of ma.matchAll(/const\s+(\w+)\s*=\s*z\.object\(\{([\s\S]*?)\n\}\)/g)) {
+        luocDo.set(z[1], khoaTangNgoai(z[2]));
+      }
+      const khoaZod = new Set<string>();
+      for (const d of ma.matchAll(/(\w+)\.(?:safeParse|parse)\(/g)) {
+        for (const k of luocDo.get(d[1]) ?? []) khoaZod.add(k);
+      }
+
+      for (const m of ma.matchAll(
+        /\.from\('(\w+)'\)\s*\n?\s*\.(insert|upsert)\(\s*\{([\s\S]*?)\n\s*\}/g,
+      )) {
+        const [, tenBang, , than] = m;
+        const cots = bang.get(tenBang);
+        if (!cots) continue;
+
+        // CHỈ lấy khoá ở TẦNG NGOÀI CÙNG. Lấy cả khoá lồng bên trong là báo
+        // nhầm: `events.insert({ payload: { input, result, votes … } })` hoàn
+        // toàn đúng vì `payload` là cột jsonb — mấy khoá bên trong nó là dữ
+        // liệu, không phải tên cột. (Bản đầu của test này báo nhầm đúng kiểu
+        // đó cho 3 route; test báo nhầm thì người ta sẽ bỏ qua nó.)
+        const dung = new Set<string>(khoaTangNgoai(than));
+        if (/\.\.\.\s*parsed\.data/.test(than)) for (const k of khoaZod) dung.add(k);
+
+        for (const c of dung) {
+          if (!cots.has(c)) {
+            const gan = [...cots].filter((x) => x.includes(c.split('_')[0])).slice(0, 2).join(', ');
+            hong.push(
+              `${path.relative(THU_MUC_API, tep).replace(/\\/g, '/')} · ` +
+                `${tenBang}.insert({ ${c}: … }) KHÔNG tồn tại${gan ? ` — gần nhất: ${gan}` : ''}`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(
+      hong,
+      `\n${hong.length} khoá ghi vào cột không tồn tại ⇒ endpoint KHÔNG BAO GIỜ ghi được:\n  ` +
+        hong.join('\n  ') +
+        '\n',
+    ).toEqual([]);
+  });
+
   it('3. mọi .select(danh sách cột) đều trỏ tới cột CÓ THẬT', () => {
     const hong: string[] = [];
     for (const tep of moiRoute(THU_MUC_API)) {

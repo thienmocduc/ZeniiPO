@@ -52,12 +52,14 @@ export async function POST(req: Request) {
   const { data, error } = await supabase
     .from('external_stakeholders')
     .insert({
+      // Khớp đúng cột `external_stakeholders`: name → full_name,
+      // organization → firm_name, scope → scope_permissions.
       tenant_id: tenantId,
       role: parsed.data.role,
-      name: parsed.data.name,
+      full_name: parsed.data.name,
       email: parsed.data.email,
-      organization: parsed.data.organization,
-      scope: parsed.data.scope,
+      firm_name: parsed.data.organization,
+      scope_permissions: parsed.data.scope,
       invited_by: user.id,
     })
     .select()

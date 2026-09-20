@@ -9,14 +9,27 @@ export const runtime = 'nodejs'
 
 const STATUSES = ['planning', 'outreach', 'dd', 'term_sheet', 'closing', 'closed'] as const
 
+/**
+ * Tên trường KHỚP ĐÚNG cột của bảng `fundraise_rounds`.
+ *
+ * Bản trước khai `name`, `round_type`, `target_amount`, `pre_money_valuation`,
+ * `opened_at`, `expected_close_at` — KHÔNG cột nào trong số đó tồn tại. Cả sáu
+ * đều nằm ở nhánh ghi, nên endpoint tạo vòng gọi vốn **chưa bao giờ tạo được
+ * một bản ghi nào**: mọi lần gọi đều rơi vào lỗi 500.
+ *
+ * Tiền ở bảng này ghi bằng USD (`*_usd`) vì vòng gọi vốn quốc tế yết theo USD;
+ * đây là ngoại lệ có chủ đích so với quy ước "tiền là BIGINT VND".
+ */
 const CreateSchema = z.object({
-  name: safeString.min(1),
-  round_type: safeString.min(1),
-  target_amount: z.number().positive(),
-  pre_money_valuation: z.number().positive().optional(),
+  round_name: safeString.min(1),
+  /** Mã vòng: seed, series_a… Dùng cho đối chiếu và sắp xếp. */
+  round_code: safeString.min(1),
+  target_raise_usd: z.number().positive(),
+  pre_money_usd: z.number().positive().optional(),
   status: z.enum(STATUSES).optional(),
-  opened_at: safeString.optional(),
-  expected_close_at: safeString.optional(),
+  /** Ngày dự kiến chốt vòng. */
+  target_close_date: safeString.optional(),
+  lead_investor: safeString.optional(),
 })
 
 export async function GET() {

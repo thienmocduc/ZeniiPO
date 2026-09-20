@@ -56,12 +56,15 @@ export async function POST(req: Request) {
   const { data, error } = await supabase
     .from('dd_qa_threads')
     .insert({
+      // Khớp đúng cột `dd_qa_threads`. `topic` và `asked_by` KHÔNG có cột
+      // tương ứng — người hỏi được suy ra từ `investor_access_id` (mỗi quyền
+      // truy cập gắn với một nhà đầu tư), nên không cần lưu lại lần nữa.
       tenant_id: tenantId,
-      access_id: parsed.data.access_id,
-      question: parsed.data.question,
-      topic: parsed.data.topic,
+      investor_access_id: parsed.data.access_id,
+      question: parsed.data.topic
+        ? `[${parsed.data.topic}] ${parsed.data.question}`
+        : parsed.data.question,
       status: 'open',
-      asked_by: user.id,
     })
     .select()
     .single()

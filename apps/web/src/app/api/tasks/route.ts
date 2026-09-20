@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/api/tenant'
 import { safeString, safeUuid } from '@/lib/security/schemas'
 
 export const dynamic = 'force-dynamic'
@@ -53,9 +54,16 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const tenantId = await getCurrentTenantId(supabase, user.id)
+  if (!tenantId) {
+    return NextResponse.json({ error: 'No tenant for user' }, { status: 403 })
+  }
+
   const { data, error } = await supabase
     .from('tasks')
-    .insert({ ...parsed.data, created_by: user.id })
+    // `tasks` KHÔNG có cột `created_by`. Và bản trước còn KHÔNG gán
+    // `tenant_id` — với RLS bật thì bản ghi thiếu tenant sẽ bị chặn ghi.
+    .insert({ ...parsed.data, tenant_id: tenantId })
     .select()
     .single()
 

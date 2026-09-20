@@ -63,7 +63,9 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabase
     .from('okr_objectives')
-    .insert({ ...parsed.data, tenant_id: tenantId, created_by: user.id })
+    // `okr_objectives` KHÔNG có cột `created_by` — người tạo lấy từ nhật ký
+    // kiểm toán, không nhân bản vào bảng nghiệp vụ.
+    .insert({ ...parsed.data, tenant_id: tenantId })
     .select()
     .single()
 
