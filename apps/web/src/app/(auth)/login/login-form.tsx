@@ -27,8 +27,9 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
+import { Eye, EyeOff, Loader2, LogIn, Mail, ShieldCheck, Smartphone } from 'lucide-react';
 import { oauthDaBat } from '@/lib/zeni/oauth';
+import { PhoneForm } from './phone-form';
 
 /** Logo Google đúng 4 màu — dùng chữ "G" tự vẽ là vi phạm quy chuẩn thương hiệu. */
 function LogoGoogle() {
@@ -56,6 +57,8 @@ export function LoginForm() {
 
   const [authError, setAuthError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  /** Hai cách vào cùng một tài khoản Zeni ID — email+mật khẩu, hoặc SĐT+mã OTP. */
+  const [cach, setCach] = useState<'email' | 'dien-thoai'>('email');
 
   const {
     register,
@@ -101,11 +104,54 @@ export function LoginForm() {
         <h1 className="font-display text-3xl text-ivory leading-tight">
           Đăng nhập <span className="italic text-gold-light">Zeniipo</span>
         </h1>
-        <p className="mt-2 font-serif italic text-ink-2 text-sm">
-          Dùng tài khoản Zeni ID của bạn. Dữ liệu mỗi tổ chức tách biệt hoàn toàn.
+
+        {/* Chairman nhìn màn hình và nói "không có đăng nhập Zeni ID" — trong khi
+            chính ô email/mật khẩu này LÀ đăng nhập Zeni ID (mật khẩu do
+            zenicloud.io xác thực, ZeniIPO không giữ). Lỗi là em chỉ ghi điều đó
+            bằng một dòng chữ nhỏ in nghiêng. Nói thẳng ra bằng một dấu hiệu
+            nhìn thấy được. */}
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-3 py-1">
+          <ShieldCheck size={13} className="text-gold-light" />
+          <span className="font-mono text-2xs uppercase tracking-widest text-gold-light">
+            Đăng nhập bằng Zeni ID
+          </span>
+        </div>
+
+        <p className="mt-3 font-serif italic text-ink-2 text-sm">
+          Một tài khoản dùng chung cho cả hệ sinh thái Zeni. Dữ liệu mỗi tổ chức
+          tách biệt hoàn toàn.
         </p>
       </header>
 
+      {/* Hai cách vào cùng một tài khoản Zeni ID. Đăng nhập bằng số điện thoại
+          là đường có sẵn của nền tảng (SMS OTP) — với doanh nhân Việt thì đây là
+          cách quen tay hơn cả. */}
+      <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg border border-w-12 bg-panel-2 p-1">
+        {(
+          [
+            { ma: 'email', chu: 'Email', Icon: Mail },
+            { ma: 'dien-thoai', chu: 'Số điện thoại', Icon: Smartphone },
+          ] as const
+        ).map(({ ma, chu, Icon }) => (
+          <button
+            key={ma}
+            type="button"
+            onClick={() => setCach(ma)}
+            aria-pressed={cach === ma}
+            className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition ${
+              cach === ma ? 'bg-gold text-bg' : 'text-ink-2 hover:text-ivory'
+            }`}
+          >
+            <Icon size={15} />
+            {chu}
+          </button>
+        ))}
+      </div>
+
+      {cach === 'dien-thoai' && <PhoneForm redirect={redirect} />}
+
+      {cach === 'email' && (
+        <>
       {authError && (
         <div
           role="alert"
@@ -203,9 +249,11 @@ export function LoginForm() {
           className="w-full bg-gold text-bg px-8 py-3 rounded font-semibold hover:bg-gold-light transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
         >
           {isSubmitting && <Loader2 className="animate-spin" size={18} />}
-          {isSubmitting ? 'Đang đăng nhập...' : '🔐 Đăng nhập'}
+          {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập bằng Zeni ID'}
         </button>
       </form>
+        </>
+      )}
 
       {/* Đăng ký là NÚT viền, không phải chữ nhỏ lẫn vào chú thích.
           Chairman nhìn màn hình cũ và hỏi "web độc lập thì phải có trường đăng

@@ -79,6 +79,34 @@ test.describe('Smoke · public surface', () => {
     await expect(page.getByTestId('loi-dang-nhap')).toBeVisible({ timeout: 10000 })
   })
 
+  test('có ĐỦ HAI cách đăng nhập: email và số điện thoại', async ({ page }) => {
+    await page.goto('/login')
+
+    // Nhãn Zeni ID phải nhìn thấy được — chairman xem màn hình cũ và nói
+    // "không có đăng nhập Zeni ID" trong khi form email/mật khẩu CHÍNH LÀ nó,
+    // chỉ vì điều đó chỉ được ghi bằng một dòng chữ nhỏ in nghiêng.
+    await expect(page.getByText('Đăng nhập bằng Zeni ID').first()).toBeVisible()
+
+    const theEmail = page.getByRole('button', { name: 'Email', exact: true })
+    const theSdt = page.getByRole('button', { name: 'Số điện thoại', exact: true })
+    await expect(theEmail).toBeVisible()
+    await expect(theSdt).toBeVisible()
+
+    // Mặc định là email.
+    await expect(page.locator('input[type="email"]').first()).toBeVisible()
+
+    // Chuyển sang số điện thoại thì phải hiện ô nhập SĐT và nút gửi mã,
+    // đồng thời ô mật khẩu biến mất (không để hai form chồng nhau).
+    await theSdt.click()
+    await expect(page.locator('input[type="tel"]')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Gửi mã xác thực/i })).toBeVisible()
+    await expect(page.locator('input[type="password"]')).toHaveCount(0)
+
+    // Quay lại email thì form cũ trở lại nguyên vẹn.
+    await theEmail.click()
+    await expect(page.locator('input[type="password"]').first()).toBeVisible()
+  })
+
   test('quên mật khẩu PHẢI gọi được Zeni ID, không báo "chưa mở chức năng"', async ({ page }) => {
     // Chairman tự đâm phải lỗi này 20/09/2026: màn hình báo "Zeni ID chưa mở
     // chức năng đặt lại mật khẩu" — MỘT LỜI NÓI SAI SỰ THẬT. Nền tảng có sẵn
