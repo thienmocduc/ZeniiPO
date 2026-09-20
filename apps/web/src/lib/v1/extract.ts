@@ -454,6 +454,10 @@ export function rewriteSidebarForNextLinks(
       : []),
     { route: 'cockpit', page: 'cockpit', ic: '◉', tx: 'Command Cockpit', pill: '<span class="pill new">LIVE</span>' },
     { route: 'journey', page: 'journey', ic: '✦', tx: 'Hành trình 7 tầng', pill: '<span class="pill new">CORE</span>' },
+    // Mô hình kinh doanh — màn hình của BƯỚC 1 theo `journey_phase_specs`.
+    // API /api/canvas có từ lâu nhưng trước lần này KHÔNG trang nào gọi tới,
+    // nên doanh nghiệp vào ZeniIPO không có đường đóng khung mô hình của mình.
+    { route: 'bmc', page: 'bmc', ic: '▦', tx: 'Mô hình kinh doanh', pill: '<span class="pill new">BƯỚC 1</span>' },
     { route: 'financial-model', page: 'finmodel', ic: '∿', tx: 'Financial Model', pill: '<span class="pill">MC</span>' },
     { route: 'certificates', page: 'certs', ic: '🎓', tx: 'Chứng nhận', pill: '' },
   ]
