@@ -288,6 +288,40 @@ html {
   color: #dfc584;
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   CHÚ NGHĨA THUẬT NGỮ — nghĩa tiếng Việt hiện ngay bên cạnh
+   Thuật ngữ giữ nguyên tiếng Anh (giới làm nghề ở Việt Nam vẫn gọi vậy),
+   nghĩa ngắn đi kèm trong ngoặc, rê chuột ra câu giải thích đầy đủ.
+   ──────────────────────────────────────────────────────────────────────── */
+abbr.zi-tn {
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(201, 168, 76, 0.5);
+  cursor: help;
+  white-space: nowrap;
+}
+abbr.zi-tn > .zi-tn-nghia {
+  margin-left: 0.3em;
+  font-size: 0.82em;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--mute, #6a7382);
+  white-space: normal;
+}
+abbr.zi-tn > .zi-tn-nghia::before {
+  content: '(';
+}
+abbr.zi-tn > .zi-tn-nghia::after {
+  content: ')';
+}
+/* Trong tiêu đề và ô số liệu thì chỉ giữ gạch chân + chú giải rê chuột —
+   nhét thêm chữ vào đó là vỡ hàng. */
+.app h1 abbr.zi-tn > .zi-tn-nghia,
+.app h2 abbr.zi-tn > .zi-tn-nghia,
+.app .kpi-v abbr.zi-tn > .zi-tn-nghia,
+.app th abbr.zi-tn > .zi-tn-nghia {
+  display: none;
+}
+
 /* Nền: hai vầng sáng rất nhạt, ĐỨNG YÊN. Nền có chuyển động thì mắt người
    dùng bị kéo khỏi con số — thứ họ vào đây để đọc. */
 .cosmic .orb {

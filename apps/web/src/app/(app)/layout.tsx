@@ -7,6 +7,7 @@ import { V1Modals } from '@/components/v1-modals';
 import { V1Interactivity } from '@/components/v1-interactivity';
 import { IdentityBind } from '@/components/identity-bind';
 import { AccountMenu } from '@/components/account-menu';
+import { ChuThuatNgu } from '@/components/chu-thuat-ngu';
 import {
   getSidebarInner,
   rewriteSidebarForNextLinks,
@@ -65,6 +66,10 @@ export default async function AppLayout({
       <IdentityBind />
       {/* Nút đăng xuất — trước đây toàn hệ không có đường thoát phiên */}
       <AccountMenu email={user.email} />
+      {/* Chú nghĩa tiếng Việt ngay cạnh thuật ngữ chuyên ngành (ARR, term
+          sheet, cap table…) — lệnh chairman 20/09: thuật ngữ thì song ngữ,
+          tiếng Anh thường thì dịch hẳn. */}
+      <ChuThuatNgu />
     </>
   );
 }
