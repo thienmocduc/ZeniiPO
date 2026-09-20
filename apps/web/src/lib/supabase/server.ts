@@ -27,25 +27,34 @@ async function ensureProvisioned(
 ): Promise<void> {
   if (provisioned.has(uid)) return;
   try {
-    await query(
-      `INSERT INTO auth.users (id, email, raw_user_meta_data)
-       VALUES ($1, $2, $3::jsonb)
-       ON CONFLICT (id) DO UPDATE SET email = COALESCE(EXCLUDED.email, auth.users.email)`,
-      [uid, email, JSON.stringify({ full_name: name ?? email ?? 'Zeni User' })],
-    );
-    if (superFlag) {
-      await query(
-        `UPDATE public.user_profiles
-         SET is_chairman_super = true
-         WHERE id = $1 AND is_chairman_super IS DISTINCT FROM true`,
-        [uid],
-      );
-    }
+    // Gọi CỬA HẸP `zeni_provision_user` (migration 031) thay vì chèn thẳng vào
+    // `auth.users`.
+    //
+    // VÌ SAO ĐỔI (20/09/2026): từ khi ứng dụng nối bằng vai chạy KHÔNG sở hữu
+    // bảng — điều kiện bắt buộc để RLS có hiệu lực — thì nó không còn quyền
+    // đụng vào schema `auth`. Lệnh chèn cũ thất bại và lỗi bị nuốt ngay dưới
+    // đây, nên người đăng ký mới KHÔNG có tổ chức và mọi trang trả 403
+    // "No tenant for user". Đăng ký hỏng mà không ai biết.
+    //
+    // Chạy trong `withUser` để phiên mang vai `authenticated` — đúng vai được
+    // cấp quyền EXECUTE. Cờ chủ nền tảng do chính hàm tra trong bảng
+    // `platform_superadmins`, phía gọi KHÔNG truyền vào được (chống tự nâng
+    // quyền), nên `superFlag` ở đây chỉ còn dùng để ghi nhật ký.
+    await withUser(uid, async (client) => {
+      await client.query('SELECT public.zeni_provision_user($1, $2, $3)', [
+        uid,
+        email,
+        name ?? email ?? 'Zeni User',
+      ]);
+    });
     provisioned.add(uid);
   } catch (e) {
-    // Best-effort (vd DB chưa gắn — ticket #8): không chặn request, query sau
-    // sẽ trả error rõ ràng qua compat client.
-    console.error('[zeni] provision user:', e instanceof Error ? e.message : e);
+    // KHÔNG nuốt im lặng nữa: ghi rõ đây là lỗi ghi danh, vì chính chỗ này đã
+    // làm hỏng đăng ký suốt một lần đổi vai mà không phát ra tín hiệu nào.
+    console.error(
+      `[zeni] GHI DANH THẤT BẠI uid=${uid} super=${superFlag} — người dùng sẽ không có tổ chức:`,
+      e instanceof Error ? e.message : e,
+    );
   }
 }
 
