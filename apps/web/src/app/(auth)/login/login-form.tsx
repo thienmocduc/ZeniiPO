@@ -22,13 +22,24 @@
  */
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2, LogIn, Mail, ShieldCheck, Smartphone } from 'lucide-react';
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  LogIn,
+  Mail,
+  ShieldCheck,
+  Smartphone,
+  WifiOff,
+} from 'lucide-react';
 import { oauthDaBat } from '@/lib/zeni/oauth';
+import { KHOA, docGhiNho, luuGhiNho, xoaGhiNho } from '@/lib/zeni/ghi-nho';
 import { PhoneForm } from './phone-form';
 
 /** Logo Google đúng 4 màu — dùng chữ "G" tự vẽ là vi phạm quy chuẩn thương hiệu. */
@@ -42,6 +53,36 @@ function LogoGoogle() {
     </svg>
   );
 }
+
+/** Dấu Zeni Digital — chữ Z trong khung, dùng đúng màu vàng của bộ nhận diện. */
+function LogoZeniDigital() {
+  return (
+    <span className="flex h-[18px] w-[18px] items-center justify-center rounded-[4px] bg-gold/20 font-display text-[11px] font-bold text-gold-light">
+      Z
+    </span>
+  );
+}
+
+/**
+ * Các cách đăng nhập ngoài hiện trên màn hình.
+ * `choLyDo` khác null ⇒ luôn ở trạng thái chờ, kể cả khi đã bật cờ OAuth —
+ * dùng cho nhà cung cấp mà chính nền tảng còn báo chưa sẵn sàng.
+ */
+const NHA_CUNG_CAP: {
+  ma: string;
+  ten: string;
+  Logo: () => React.JSX.Element;
+  choLyDo: string | null;
+}[] = [
+  { ma: 'google', ten: 'Google', Logo: LogoGoogle, choLyDo: null },
+  {
+    ma: 'zenidigital',
+    ten: 'Zeni Digital',
+    Logo: LogoZeniDigital,
+    // Hỏi nền tảng ngày 20/09/2026: provider zenidigital trả `ready: false`.
+    choLyDo: 'Zeni Cloud chưa bật kết nối Zeni Digital (nền tảng báo chưa sẵn sàng)',
+  },
+];
 
 const schema = z.object({
   email: z.string().min(1, 'Nhập email').email('Email không hợp lệ'),
@@ -59,18 +100,58 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   /** Hai cách vào cùng một tài khoản Zeni ID — email+mật khẩu, hoặc SĐT+mã OTP. */
   const [cach, setCach] = useState<'email' | 'dien-thoai'>('email');
+  /** Bật CapsLock là nguyên nhân số một của "mật khẩu đúng mà báo sai". */
+  const [capsLock, setCapsLock] = useState(false);
+  const [mangOffline, setMangOffline] = useState(false);
+  /** Email lần trước — mời quay lại bằng một cú bấm thay vì gõ lại. */
+  const [emailCuoi, setEmailCuoi] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    setValue,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
   });
 
+  // Nhớ cách đăng nhập quen và email lần trước. Chạy sau khi dựng xong giao diện
+  // để máy chủ và trình duyệt vẽ ra giống nhau (tránh lệch khi bù nước).
+  useEffect(() => {
+    if (docGhiNho(KHOA.cachCuoi) === 'dien-thoai') setCach('dien-thoai');
+    const e = docGhiNho(KHOA.emailCuoi);
+    if (e) setEmailCuoi(e);
+  }, []);
+
+  useEffect(() => {
+    luuGhiNho(KHOA.cachCuoi, cach);
+  }, [cach]);
+
+  // Mất mạng thì nói ngay, đừng để người dùng bấm rồi chờ hết giờ mới biết.
+  useEffect(() => {
+    const capNhat = () => setMangOffline(!navigator.onLine);
+    capNhat();
+    window.addEventListener('online', capNhat);
+    window.addEventListener('offline', capNhat);
+    return () => {
+      window.removeEventListener('online', capNhat);
+      window.removeEventListener('offline', capNhat);
+    };
+  }, []);
+
+  function dungEmailCuoi() {
+    if (!emailCuoi) return;
+    setValue('email', emailCuoi, { shouldValidate: true });
+    setEmailCuoi(null);
+    setFocus('password');
+  }
+
   async function onSubmit(values: FormValues) {
     setAuthError(null);
+    // Nhớ email để lần sau chỉ cần bấm một cái. KHÔNG bao giờ nhớ mật khẩu.
+    luuGhiNho(KHOA.emailCuoi, values.email.trim());
     try {
       const res = await fetch('/api/auth/zeni/login', {
         method: 'POST',
@@ -123,6 +204,88 @@ export function LoginForm() {
         </p>
       </header>
 
+      {/* ĐĂNG NHẬP BẰNG NHÀ CUNG CẤP NGOÀI — đi qua Zeni ID, app KHÔNG tự đấu
+          Google.
+          Lệnh chairman 20/09: nút nào chưa có OAuth thì CỨ HIỆN, đánh dấu đang
+          chờ. Nên nút hiện nhưng KHOÁ hẳn (`disabled` + `aria-disabled`) kèm chữ
+          "đang chờ kết nối" — người dùng thấy được lộ trình mà không ai bấm phải
+          một đường dẫn ném họ sang tên miền khác.
+          Bật thật = đặt NEXT_PUBLIC_ZENI_OAUTH=1 khi ZeniCloud cấp khoá. */}
+      <div className="mb-6 space-y-3">
+        {NHA_CUNG_CAP.map(({ ma, ten, Logo, choLyDo }) => {
+          const sanSang = oauthDaBat() && !choLyDo;
+          return sanSang ? (
+            <a
+              key={ma}
+              href={`/api/auth/zeni/oauth/${ma}?redirect=${encodeURIComponent(redirect)}`}
+              data-testid={`oauth-${ma}`}
+              className="flex w-full items-center justify-center gap-3 rounded border border-w-12 bg-panel-2 px-8 py-3 font-medium text-ivory transition hover:border-gold/50 hover:bg-panel"
+            >
+              <Logo />
+              Tiếp tục với {ten}
+            </a>
+          ) : (
+            <button
+              key={ma}
+              type="button"
+              disabled
+              aria-disabled="true"
+              data-testid={`oauth-${ma}-cho`}
+              title={choLyDo ?? 'Đang chờ Zeni Cloud cấp khoá kết nối'}
+              className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded border border-dashed border-w-12 bg-panel-2/40 px-8 py-3 font-medium text-ink-dim"
+            >
+              <span className="opacity-40">
+                <Logo />
+              </span>
+              Tiếp tục với {ten}
+              <span className="rounded-full border border-w-12 px-2 py-0.5 font-mono text-2xs uppercase tracking-wider">
+                đang chờ
+              </span>
+            </button>
+          );
+        })}
+        <p className="text-center text-2xs text-ink-dim">
+          Các cách đăng nhập trên đang chờ Zeni Cloud cấp khoá kết nối. Trong lúc
+          đó, dùng Zeni ID bên dưới — đầy đủ chức năng.
+        </p>
+      </div>
+
+      <div className="mb-6 flex items-center gap-4">
+        <span className="h-px flex-1 bg-w-12" />
+        <span className="font-mono text-2xs uppercase tracking-widest text-ink-dim">hoặc</span>
+        <span className="h-px flex-1 bg-w-12" />
+      </div>
+
+      {/* Mất mạng thì nói ngay, đừng để người dùng bấm rồi chờ hết giờ mới biết. */}
+      {mangOffline && (
+        <div
+          role="status"
+          data-testid="mat-mang"
+          className="mb-5 flex items-center gap-2 rounded border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-warn"
+        >
+          <WifiOff size={16} />
+          Máy bạn đang mất kết nối mạng — nối lại rồi hãy đăng nhập.
+        </div>
+      )}
+
+      {/* Quay lại bằng một cú bấm. Chỉ nhớ EMAIL, không bao giờ nhớ mật khẩu. */}
+      {cach === 'email' && emailCuoi && (
+        <button
+          type="button"
+          onClick={dungEmailCuoi}
+          data-testid="email-lan-truoc"
+          className="mb-5 flex w-full items-center justify-between gap-3 rounded border border-gold/25 bg-gold/5 px-4 py-3 text-left transition hover:border-gold/50 hover:bg-gold/10"
+        >
+          <span className="min-w-0">
+            <span className="block font-mono text-2xs uppercase tracking-widest text-ink-dim">
+              Lần trước bạn dùng
+            </span>
+            <span className="block truncate text-sm text-ivory">{emailCuoi}</span>
+          </span>
+          <ArrowRight size={16} className="shrink-0 text-gold-light" />
+        </button>
+      )}
+
       {/* Hai cách vào cùng một tài khoản Zeni ID. Đăng nhập bằng số điện thoại
           là đường có sẵn của nền tảng (SMS OTP) — với doanh nhân Việt thì đây là
           cách quen tay hơn cả. */}
@@ -166,28 +329,6 @@ export function LoginForm() {
         </div>
       )}
 
-      {/* Đăng nhập bằng nhà cung cấp ngoài — đi qua Zeni ID, app KHÔNG tự đấu
-          Google. Nút bị khoá sau cờ cho tới khi nền tảng thêm zeniipo.com vào
-          danh sách trắng nhận token; chi tiết ở `@/lib/zeni/oauth`. Thà chưa
-          hiện còn hơn hiện một nút bấm vào thì lạc sang tên miền khác. */}
-      {oauthDaBat() && (
-        <>
-          <a
-            href={`/api/auth/zeni/oauth/google?redirect=${encodeURIComponent(redirect)}`}
-            className="mb-5 flex w-full items-center justify-center gap-3 rounded border border-w-12 bg-panel-2 px-8 py-3 font-medium text-ivory transition hover:border-gold/50 hover:bg-panel"
-          >
-            <LogoGoogle />
-            Tiếp tục với Google
-          </a>
-
-          <div className="mb-5 flex items-center gap-4">
-            <span className="h-px flex-1 bg-w-12" />
-            <span className="font-mono text-2xs uppercase tracking-widest text-ink-dim">hoặc</span>
-            <span className="h-px flex-1 bg-w-12" />
-          </div>
-        </>
-      )}
-
       {/* `onSubmit` của form ⇒ gõ Enter cũng đăng nhập được (bản cũ không) */}
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <div>
@@ -217,6 +358,10 @@ export function LoginForm() {
               autoComplete="current-password"
               placeholder="••••••••"
               {...register('password')}
+              // Bật CapsLock là nguyên nhân số một của "mật khẩu đúng mà báo
+              // sai" — người dùng không nhìn thấy chữ mình gõ nên không biết.
+              onKeyUp={(e) => setCapsLock(e.getModifierState?.('CapsLock') ?? false)}
+              onBlur={() => setCapsLock(false)}
               className={`${inputCls} pr-12`}
             />
             <button
@@ -228,6 +373,16 @@ export function LoginForm() {
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+          {capsLock && (
+            <p
+              role="status"
+              data-testid="canh-bao-capslock"
+              className="mt-2 flex items-center gap-2 text-xs text-warn"
+            >
+              <ShieldCheck size={13} />
+              Đang bật CapsLock — chữ hoa thường sẽ khác với mật khẩu bạn nhớ.
+            </p>
+          )}
           {errors.password && (
             <p className="text-err text-sm mt-1">{errors.password.message}</p>
           )}

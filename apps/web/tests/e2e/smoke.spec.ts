@@ -107,6 +107,51 @@ test.describe('Smoke · public surface', () => {
     await expect(page.locator('input[type="password"]').first()).toBeVisible()
   })
 
+  test('nút Google / Zeni Digital hiện ra nhưng KHOÁ, ghi rõ đang chờ', async ({ page }) => {
+    await page.goto('/login')
+
+    // Lệnh chairman 20/09: nút nào chưa có OAuth thì cứ hiện, đánh dấu đang chờ.
+    // Ràng buộc kèm theo: đã hiện thì TUYỆT ĐỐI không được bấm được, vì chưa có
+    // khoá thì bấm vào sẽ ném người dùng sang tên miền khác.
+    for (const ma of ['google', 'zenidigital']) {
+      const nut = page.getByTestId(`oauth-${ma}-cho`)
+      await expect(nut).toBeVisible()
+      await expect(nut).toBeDisabled()
+      await expect(nut).toContainText(/đang chờ/i)
+    }
+
+    // Và không có phiên bản bấm được nào lọt ra cùng lúc.
+    await expect(page.getByTestId('oauth-google')).toHaveCount(0)
+
+    // Người dùng phải được chỉ sang đường đi được ngay, không bị bỏ lửng.
+    await expect(page.locator('body')).toContainText(/dùng Zeni ID bên dưới/i)
+  })
+
+  test('nhớ email lần trước + nhớ cách đăng nhập quen', async ({ page }) => {
+    // Đăng nhập hụt một lần để app ghi nhớ email (KHÔNG nhớ mật khẩu).
+    await page.goto('/login')
+    await page.locator('input[type="email"]').first().fill('nho-toi@zeniipo.com')
+    await page.locator('input[type="password"]').first().fill('sai-mat-khau')
+    await page.locator('button[type="submit"]').first().click()
+    await expect(page.getByTestId('loi-dang-nhap')).toBeVisible({ timeout: 15000 })
+
+    // Quay lại: phải mời sẵn email cũ, bấm một cái là điền.
+    await page.reload()
+    const moi = page.getByTestId('email-lan-truoc')
+    await expect(moi).toBeVisible()
+    await expect(moi).toContainText('nho-toi@zeniipo.com')
+    await moi.click()
+    await expect(page.locator('input[type="email"]').first()).toHaveValue('nho-toi@zeniipo.com')
+
+    // Mật khẩu thì TUYỆT ĐỐI không được nhớ.
+    await expect(page.locator('input[type="password"]').first()).toHaveValue('')
+
+    // Đổi sang thẻ số điện thoại rồi tải lại — phải nhớ cách quen dùng.
+    await page.getByRole('button', { name: 'Số điện thoại', exact: true }).click()
+    await page.reload()
+    await expect(page.locator('input[type="tel"]')).toBeVisible()
+  })
+
   test('quên mật khẩu PHẢI gọi được Zeni ID, không báo "chưa mở chức năng"', async ({ page }) => {
     // Chairman tự đâm phải lỗi này 20/09/2026: màn hình báo "Zeni ID chưa mở
     // chức năng đặt lại mật khẩu" — MỘT LỜI NÓI SAI SỰ THẬT. Nền tảng có sẵn

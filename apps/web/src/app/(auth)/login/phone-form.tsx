@@ -40,6 +40,23 @@ export function PhoneForm({ redirect }: { redirect: string }) {
     if (buoc === 'ma') oMa.current?.focus();
   }, [buoc]);
 
+  /**
+   * Nhập / dán đủ 6 số thì tự gửi luôn, khỏi phải với tay bấm nút.
+   * `daTuGui` chặn gửi hai lần khi người dùng sửa rồi gõ lại đúng 6 số —
+   * không có nó, mỗi lần chạm số thứ 6 lại bắn thêm một yêu cầu.
+   */
+  const daTuGui = useRef(false);
+  useEffect(() => {
+    if (ma.length !== 6) {
+      daTuGui.current = false;
+      return;
+    }
+    if (daTuGui.current || dangChay) return;
+    daTuGui.current = true;
+    void dangNhap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ma]);
+
   async function xinMa(e?: React.FormEvent) {
     e?.preventDefault();
     setLoi(null);
@@ -67,8 +84,8 @@ export function PhoneForm({ redirect }: { redirect: string }) {
     }
   }
 
-  async function dangNhap(e: React.FormEvent) {
-    e.preventDefault();
+  async function dangNhap(e?: React.FormEvent) {
+    e?.preventDefault();
     setLoi(null);
     setDangChay(true);
     try {
