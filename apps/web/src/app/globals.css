@@ -65,6 +65,94 @@ html {
   --c7: #9aaab8; /* bạch kim        */
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   THANH TIÊU ĐỀ TRANG — GỌN VÀ DÍNH (lệnh chairman 20/09/2026)
+
+   Trước: mỗi trang mở đầu bằng một khối cao — đường dẫn, tiêu đề cỡ lớn, câu
+   giới thiệu, và HÀNG NÚT CHỨC NĂNG nằm cùng khối đó. Khối ấy cuộn theo trang,
+   nên xuống giữa bảng số liệu muốn bấm "Xuất" hay "Tạo OKR" là phải cuộn ngược
+   lên tận đầu. Với người dùng doanh nghiệp ngồi cả ngày trên một bảng, đó là
+   thao tác thừa lặp lại hàng trăm lần.
+
+   Nay: cả khối co lại thành MỘT THANH NGANG dính ở đỉnh vùng nội dung. Tiêu đề
+   và câu giới thiệu rút về một dòng, cắt gọn nếu dài; nút chức năng luôn nằm
+   trong tầm tay, không cần cuộn.
+
+   Làm bằng CSS nên áp cho CẢ 30 trang cùng lúc — không phải sửa tay 30 khối
+   HTML trong bản dựng, và trang mới thêm sau cũng tự theo.
+   ──────────────────────────────────────────────────────────────────────── */
+.app .main .ph {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 16px;
+  /* Tràn ra mép để thanh chạy hết chiều ngang; .main có padding 24px/32px. */
+  margin: -24px -32px 20px;
+  padding: 10px 32px;
+  background: rgba(6, 7, 11, 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--w8);
+}
+
+.app .main .ph .ph-l {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0; /* cho phép con bên trong cắt chữ */
+}
+
+/* Đường dẫn đã có thanh bên tô sáng mục đang xem — trong thanh gọn thì thừa. */
+.app .main .ph .crumb {
+  display: none;
+}
+
+.app .main .ph h1 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Câu giới thiệu: một dòng, dài quá thì cắt bằng dấu ba chấm. */
+.app .main .ph p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--mute, #6a7382);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.app .main .ph .ph-r {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Màn hình hẹp: cho xuống hai dòng và bỏ câu giới thiệu, giữ bằng được nút. */
+@media (max-width: 900px) {
+  .app .main .ph {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: -24px -16px 16px;
+    padding: 10px 16px;
+  }
+  .app .main .ph p {
+    display: none;
+  }
+  .app .main .ph .ph-r {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+  }
+}
+
 /* Nền: hai vầng sáng rất nhạt, ĐỨNG YÊN. Nền có chuyển động thì mắt người
    dùng bị kéo khỏi con số — thứ họ vào đây để đọc. */
 .cosmic .orb {
