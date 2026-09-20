@@ -384,13 +384,19 @@ export function LoginForm() {
                 aria-disabled="true"
                 data-testid={`oauth-${ma}-cho`}
                 title={choLyDo ?? 'Đang chờ Zeni Cloud cấp khoá kết nối'}
-                className="flex cursor-not-allowed items-center justify-center gap-2 rounded border border-dashed border-w-12 px-3 py-2 text-sm text-ink-dim"
+                // Xếp dọc: tên một dòng, chữ "đang chờ" một dòng. Để chung một
+                // hàng thì trong cột hẹp "Zeni Digital" bị bẻ đôi, nhìn lộn xộn.
+                className="flex cursor-not-allowed flex-col items-center justify-center gap-0.5 rounded border border-dashed border-w-12 px-2 py-2 text-ink-dim"
               >
-                <span className="opacity-40">
-                  <Logo />
+                <span className="flex items-center gap-2 whitespace-nowrap text-sm">
+                  <span className="opacity-40">
+                    <Logo />
+                  </span>
+                  {ten}
                 </span>
-                {ten}
-                <span className="font-mono text-2xs uppercase tracking-wide">· đang chờ</span>
+                <span className="font-mono text-2xs uppercase tracking-wide opacity-70">
+                  đang chờ
+                </span>
               </button>
             );
           })}
