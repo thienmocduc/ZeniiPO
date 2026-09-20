@@ -8,6 +8,7 @@ import { V1Interactivity } from '@/components/v1-interactivity';
 import { IdentityBind } from '@/components/identity-bind';
 import { AccountMenu } from '@/components/account-menu';
 import { ChuThuatNgu } from '@/components/chu-thuat-ngu';
+import { DoiCheDo } from '@/components/doi-che-do';
 import {
   getSidebarInner,
   rewriteSidebarForNextLinks,
@@ -70,6 +71,8 @@ export default async function AppLayout({
           sheet, cap table…) — lệnh chairman 20/09: thuật ngữ thì song ngữ,
           tiếng Anh thường thì dịch hẳn. */}
       <ChuThuatNgu />
+      {/* Nút chuyển sáng/tối — hai bộ màu độc lập, xem globals.css */}
+      <DoiCheDo />
     </>
   );
 }

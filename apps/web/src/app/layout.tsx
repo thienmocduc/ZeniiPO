@@ -3,6 +3,7 @@ import { Noto_Sans } from 'next/font/google';
 import './globals.css';
 import { getCss } from '@/lib/v1/extract';
 import { CosmosBg } from '@/components/cosmos-bg';
+import { MA_CHONG_CHOP } from '@/lib/zeni/che-do';
 
 /**
  * MỘT PHÔNG DUY NHẤT CHO CẢ SẢN PHẨM — Noto Sans (lệnh chairman 20/09/2026).
@@ -99,6 +100,12 @@ export default function RootLayout({
       className={notoSans.variable}
     >
       <head>
+        {/*
+          Đặt chế độ sáng/tối TRƯỚC khi trang vẽ. Không có đoạn này thì trang
+          luôn vẽ bằng chế độ tối rồi mới nhảy sang sáng — người dùng thấy một
+          cái chớp mỗi lần mở trang. Phải chạy đồng bộ và đứng trước mọi thứ.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: MA_CHONG_CHOP }} />
         {/* v1_8_FULL.html CSS — byte-for-byte inherited */}
         <style dangerouslySetInnerHTML={{ __html: v1Css }} />
       </head>

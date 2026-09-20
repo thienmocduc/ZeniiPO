@@ -40,29 +40,161 @@ html {
   --fs: var(--font-sans), 'Noto Sans', system-ui, sans-serif;
 }
 
-/* ────────────────────────────────────────────────────────────────────────
-   BẢNG MÀU "KIM KHỐ" — ghi đè bảng màu luân xa của bản dựng V1.
+/* ════════════════════════════════════════════════════════════════════════
+   HAI BỘ MÀU ĐỘC LẬP — TỐI (mặc định) và SÁNG
 
-   Bản dựng khai --c4 xanh lá #22c55e, --c5 lơ #06b6d4, --c6 chàm #6366f1,
-   --c7 tím #a855f7 — bốn màu rực cạnh nhau, và bốn quả cầu mờ 500px dùng
-   chính những màu đó, độ mờ .28, lại còn TRÔI ĐỘNG 24 giây một vòng.
-   Đó là nền của ứng dụng tiêu dùng. Khách của ZeniIPO là doanh nghiệp mở
-   bảng cổ phần và số liệu tài chính — nền phải đứng yên và kín tiếng.
+   Chairman 20/09/2026: "giao diện sáng thì chỉ màu xanh và nền trắng ngọc
+   trai, 2 giao diện sáng tối độc lập để khi chuyển không bị lỗi màu và hiệu
+   ứng."
 
-   Ghi đè ở đây, không sửa source.html (tệp 6700 dòng, sửa tay là lần sau
-   nhập bản mới mất sạch).
-   ──────────────────────────────────────────────────────────────────────── */
+   Vì sao khai theo KÊNH `R G B` chứ không `#rrggbb`: mã nguồn dùng 105 chỗ
+   kiểu `bg-panel/80`, `border-gold/40`. Tailwind chỉ chèn được độ mờ khi giá
+   trị viết dạng `rgb(var(--m-x) / <alpha-value>)` — mà muốn vậy thì biến phải
+   là ba số kênh.
+
+   HAI BỘ ĐỘC LẬP nghĩa là: cùng một bộ TÊN biến, hai bộ GIÁ TRỊ. Không bộ nào
+   kế thừa bộ kia, nên không có chuyện chế độ sáng còn sót một màu của chế độ
+   tối — đó chính là "lỗi màu khi chuyển" mà chairman nhắc.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── CHẾ ĐỘ TỐI (mặc định) — "kim khố": đen ám khói + vàng champagne ── */
 :root,
-:root .app,
-.cosmic {
+:root[data-theme='toi'] {
+  --m-nen: 6 7 11;
+  --m-nen-2: 10 13 20;
+  --m-tam: 14 19 29;
+  --m-tam-2: 20 26 38;
+
+  --m-chu: 232 236 242;
+  --m-chu-2: 168 179 194;
+  --m-chu-mo: 106 115 130;
+  --m-chu-nhat: 72 79 92;
+  --m-nga: 244 241 234;
+
+  /* Điểm nhấn = vàng champagne */
+  --m-nhan: 201 168 76;
+  --m-nhan-sang: 223 197 132;
+  --m-nhan-dam: 139 120 52;
+
+  --m-lam: 27 58 92;
+  --m-lam-sau: 16 36 57;
+  --m-lam-nhat: 46 92 138;
+  --m-bach-kim: 154 170 184;
+  --m-bach-kim-mo: 110 124 138;
+  --m-lam-ky-thuat: 91 155 213;
+  --m-lam-ky-thuat-mo: 62 110 153;
+
+  --m-tot: 87 196 143;
+  --m-canh: 221 176 92;
+  --m-loi: 220 128 128;
+
+  /* Lớp phủ viền: nền tối thì phủ TRẮNG mờ */
+  --m-phu: 255 255 255;
+
+  /* ── Bộ biến của bản dựng V1 (51 biến) — ghi đè ĐỦ, không ghi một nửa.
+     Ghi thiếu biến nào là chỗ đó vẫn giữ màu cũ của bản dựng, và đó chính là
+     kiểu "lỗi màu khi chuyển chế độ". ── */
   --bg: #06070b;
+  --bg-2: #0a0d14;
+  --surface: rgba(14, 19, 29, 0.55);
+
+  --c4: #c9a84c;  --c4-b: #dfc584;  --c4-d: #8b7834;  --c4-g: rgba(201, 168, 76, 0.16);
+  --c5: #1b3a5c;  --c5-b: #2e5c8a;  --c5-d: #102439;  --c5-g: rgba(46, 92, 138, 0.18);
+  --c6: #2e5c8a;  --c6-b: #5b9bd5;  --c6-d: #1b3a5c;  --c6-g: rgba(91, 155, 213, 0.16);
+  --c7: #9aaab8;  --c7-b: #c3ccd9;  --c7-d: #6e7c8a;  --c7-g: rgba(154, 170, 184, 0.14);
+
+  --gold: #c9a84c;  --gold-b: #dfc584;  --gold-d: #8b7834;
+  --gold-g: rgba(201, 168, 76, 0.18);
+
+  --rose: #dc8080;
+  --amber: #ddb05c;
+  --err: #dc8080;
+
+  --w4: rgba(255, 255, 255, 0.04);
+  --w6: rgba(255, 255, 255, 0.06);
+  --w8: rgba(255, 255, 255, 0.08);
+  --w12: rgba(255, 255, 255, 0.12);
+  --w16: rgba(255, 255, 255, 0.16);
+
   --ink: #e8ecf2;
-  --gold: #c9a84c;
-  /* Bốn tông nay cùng một họ lạnh, không còn cầu vồng. */
-  --c4: #c9a84c; /* vàng champagne  */
-  --c5: #1b3a5c; /* lam sapphire    */
-  --c6: #2e5c8a; /* lam sapphire nhạt */
-  --c7: #9aaab8; /* bạch kim        */
+  --ink-2: #a8b3c2;
+  --dim: #6a7382;
+  --mute: #6a7382;
+  --faint: #484f5c;
+
+  --do-mo-vang: 0.07;
+  --bong-the: 0 20px 80px rgba(0, 0, 0, 0.5);
+}
+
+/* ── CHẾ ĐỘ SÁNG — nền trắng ngọc trai, điểm nhấn CHỈ MÀU XANH ──
+   Không có một vệt vàng nào: trên nền ngọc trai, vàng champagne bạc màu và
+   nhìn như chữ bị mờ. Điểm nhấn chuyển hẳn sang lam sapphire. */
+:root[data-theme='sang'] {
+  --m-nen: 244 246 250;   /* trắng ngọc trai */
+  --m-nen-2: 251 252 254;
+  --m-tam: 255 255 255;
+  --m-tam-2: 242 245 249;
+
+  --m-chu: 16 23 36;
+  --m-chu-2: 70 83 107;
+  --m-chu-mo: 122 134 156;
+  --m-chu-nhat: 160 170 186;
+  --m-nga: 16 23 36;      /* "ngà" ở nền sáng phải là chữ ĐẬM, không phải trắng */
+
+  /* Điểm nhấn = XANH, không phải vàng */
+  --m-nhan: 30 78 140;
+  --m-nhan-sang: 46 111 191;
+  --m-nhan-dam: 18 52 96;
+
+  --m-lam: 214 227 242;
+  --m-lam-sau: 30 78 140;
+  --m-lam-nhat: 46 111 191;
+  --m-bach-kim: 100 116 139;
+  --m-bach-kim-mo: 140 154 174;
+  --m-lam-ky-thuat: 30 108 186;
+  --m-lam-ky-thuat-mo: 96 145 197;
+
+  --m-tot: 22 138 95;
+  --m-canh: 176 118 22;
+  --m-loi: 190 52 52;
+
+  /* Lớp phủ viền: nền sáng thì phải phủ ĐEN mờ — để nguyên trắng là viền
+     biến mất sạch, đúng kiểu "lỗi màu khi chuyển chế độ". */
+  --m-phu: 16 23 36;
+
+  /* ── Bộ biến của bản dựng V1 — bản SÁNG. Không một vệt vàng nào. ── */
+  --bg: #f4f6fa;
+  --bg-2: #fbfcfe;
+  --surface: rgba(255, 255, 255, 0.72);
+
+  --c4: #1e4e8c;  --c4-b: #2e6fbf;  --c4-d: #123460;  --c4-g: rgba(30, 78, 140, 0.10);
+  --c5: #2e6fbf;  --c5-b: #5a95d6;  --c5-d: #1e4e8c;  --c5-g: rgba(46, 111, 191, 0.10);
+  --c6: #6091c5;  --c6-b: #8fb4dc;  --c6-d: #2e6fbf;  --c6-g: rgba(96, 145, 197, 0.10);
+  --c7: #8ba6c4;  --c7-b: #a8bed6;  --c7-d: #64748b;  --c7-g: rgba(139, 166, 196, 0.10);
+
+  /* "gold" ở chế độ sáng = XANH. Giữ tên biến vì bản dựng dùng ~90 chỗ. */
+  --gold: #1e4e8c;  --gold-b: #2e6fbf;  --gold-d: #123460;
+  --gold-g: rgba(30, 78, 140, 0.10);
+
+  --rose: #be3434;
+  --amber: #b07616;
+  --err: #be3434;
+
+  /* Lớp phủ ĐEN mờ — để trắng là viền biến mất sạch trên nền ngọc trai. */
+  --w4: rgba(16, 23, 36, 0.04);
+  --w6: rgba(16, 23, 36, 0.06);
+  --w8: rgba(16, 23, 36, 0.09);
+  --w12: rgba(16, 23, 36, 0.13);
+  --w16: rgba(16, 23, 36, 0.18);
+
+  --ink: #101724;
+  --ink-2: #46536b;
+  --dim: #7a869c;
+  --mute: #7a869c;
+  --faint: #c3ccd9;
+
+  --do-mo-vang: 0.05;
+  --bong-the: 0 12px 40px rgba(16, 23, 36, 0.1);
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -96,7 +228,7 @@ html {
   /* Tràn ra mép để thanh chạy hết chiều ngang; .main có padding 24px/32px. */
   margin: -24px -32px 20px;
   padding: 10px 32px;
-  background: rgba(6, 7, 11, 0.9);
+  background: rgb(var(--m-nen) / 0.9);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--w8);
@@ -128,7 +260,7 @@ html {
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.3;
-  color: var(--mute, #6a7382);
+  color: rgb(var(--m-chu-mo));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -190,8 +322,8 @@ html {
   transition: border-color 0.18s, background 0.18s;
 }
 .zi-tenant-btn:hover:not(:disabled) {
-  border-color: rgba(201, 168, 76, 0.45);
-  background: rgba(201, 168, 76, 0.07);
+  border-color: rgb(var(--m-nhan) / 0.45);
+  background: rgb(var(--m-nhan) / 0.07);
 }
 .zi-tenant-btn:disabled {
   cursor: default;
@@ -205,8 +337,8 @@ html {
   height: 26px;
   flex-shrink: 0;
   border-radius: 5px;
-  background: linear-gradient(135deg, #c9a84c, #8b7834);
-  color: #06070b;
+  background: linear-gradient(135deg, rgb(var(--m-nhan)), rgb(var(--m-nhan-dam)));
+  color: rgb(var(--m-nen));
   font-weight: 700;
   font-size: 0.78rem;
 }
@@ -234,7 +366,7 @@ html {
   font-size: 0.64rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--mute, #6a7382);
+  color: rgb(var(--m-chu-mo));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -258,15 +390,15 @@ html {
   overflow-y: auto;
   border-radius: 8px;
   border: 1px solid var(--w12);
-  background: #0e131d;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  background: rgb(var(--m-tam));
+  box-shadow: var(--bong-the);
 }
 .zi-tenant-head {
   padding: 8px 10px 6px;
   font-size: 0.62rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--mute, #6a7382);
+  color: rgb(var(--m-chu-mo));
 }
 .zi-tenant-item {
   display: flex;
@@ -285,7 +417,7 @@ html {
   background: var(--w6);
 }
 .zi-tenant-item.zi-dang-xem {
-  color: #dfc584;
+  color: rgb(var(--m-nhan-sang));
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -295,7 +427,7 @@ html {
    ──────────────────────────────────────────────────────────────────────── */
 abbr.zi-tn {
   text-decoration: none;
-  border-bottom: 1px dotted rgba(201, 168, 76, 0.5);
+  border-bottom: 1px dotted rgb(var(--m-nhan) / 0.55);
   cursor: help;
   white-space: nowrap;
 }
@@ -304,7 +436,7 @@ abbr.zi-tn > .zi-tn-nghia {
   font-size: 0.82em;
   font-weight: 400;
   font-style: italic;
-  color: var(--mute, #6a7382);
+  color: rgb(var(--m-chu-mo));
   white-space: normal;
 }
 abbr.zi-tn > .zi-tn-nghia::before {

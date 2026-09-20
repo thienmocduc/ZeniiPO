@@ -1,85 +1,94 @@
 import type { Config } from 'tailwindcss'
 import animatePlugin from 'tailwindcss-animate'
 
+/** Màu đọc từ biến CSS, chừa chỗ cho Tailwind chèn độ mờ (`bg-panel/80`). */
+const mau = (ten: string) => `rgb(var(--m-${ten}) / <alpha-value>)`;
+
 const config: Config = {
   darkMode: 'class',
   content: ['./src/**/*.{ts,tsx,js,jsx,mdx}'],
   theme: {
     extend: {
-      // ─────────────────────────────────────────────────────────────────
-      // BẢNG MÀU "KIM KHỐ" — tài chính tư nhân × công nghệ (20/09/2026)
-      //
-      // Chairman: nền tảng phục vụ khách doanh nghiệp 100% nên phải đẳng cấp,
-      // màu đúng kiểu tài chính và công nghệ của tương lai.
-      //
-      // Bản cũ chạy bảng màu "luân xa": xanh lá #22c55e, lơ #06b6d4, chàm
-      // #6366f1, tím #a855f7 — bốn màu rực nằm cạnh nhau. Đó là bảng màu của
-      // ứng dụng tiêu dùng, không phải của nơi người ta mở bảng cổ phần và số
-      // liệu tài chính. Nay theo đúng lối phòng khách ngân hàng tư nhân:
-      //
-      //   · MỘT điểm nhấn xa xỉ  → vàng champagne. Dùng dè, chỉ cho thứ quan
-      //     trọng nhất trên màn hình. Vàng mà rải khắp nơi thì hết sang.
-      //   · Chiều sâu           → lam sapphire, thay cho tím/chàm.
-      //   · Chữ phụ             → bạch kim (xám ngả lam), cảm giác kim loại.
-      //   · Dữ liệu, liên kết   → MỘT tông lam kỹ thuật, sạch và lạnh.
-      //   · Trạng thái          → giảm độ rực: bảng số liệu tài chính mà xanh
-      //     đỏ neon thì nhìn như trò chơi.
-      // ─────────────────────────────────────────────────────────────────
+      /**
+       * MÀU LẤY TỪ BIẾN CSS — hai bộ sáng/tối HOÀN TOÀN ĐỘC LẬP.
+       *
+       * Chairman 20/09/2026: "giao diện sáng thì chỉ màu xanh và nền trắng
+       * ngọc trai, 2 giao diện sáng tối độc lập để khi chuyển không bị lỗi màu
+       * và hiệu ứng."
+       *
+       * Trước đây màu là mã cứng (#0E131D, #C9A84C…) nằm thẳng trong tệp này,
+       * nên không thể có hai bộ: đổi chế độ là phải đổi từng lớp ở hàng trăm
+       * chỗ, và chắc chắn sót. Nay mỗi màu trỏ tới một biến CSS; `globals.css`
+       * khai HAI bộ giá trị cho cùng bộ tên biến đó. Đổi chế độ = đổi đúng một
+       * thuộc tính trên thẻ <html>, mọi thứ theo sau.
+       *
+       * Vì sao ghi theo KÊNH `R G B` chứ không ghi `#rrggbb`: mã nguồn đang
+       * dùng 105 chỗ kiểu `bg-panel/80`, `border-gold/40`. Tailwind chỉ chèn
+       * được độ mờ vào khi giá trị có chỗ trống `<alpha-value>` — mà muốn vậy
+       * thì biến phải là ba số kênh, không phải chuỗi màu.
+       */
       colors: {
-        bg: '#06070B',
-        'bg-2': '#0A0D14',
-        panel: { DEFAULT: '#0E131D', 2: '#141A26' },
-        ink: { DEFAULT: '#E8ECF2', 2: '#A8B3C2', dim: '#6A7382', mute: '#484F5C' },
-        ivory: '#F4F1EA',
+        bg: mau('nen'),
+        'bg-2': mau('nen-2'),
+        panel: { DEFAULT: mau('tam'), 2: mau('tam-2') },
+        ink: {
+          DEFAULT: mau('chu'),
+          2: mau('chu-2'),
+          dim: mau('chu-mo'),
+          mute: mau('chu-nhat'),
+        },
+        ivory: mau('nga'),
 
-        // Điểm nhấn xa xỉ duy nhất.
-        gold: { DEFAULT: '#C9A84C', light: '#DFC584', dark: '#8B7834' },
+        /** Điểm nhấn: vàng champagne ở chế độ tối, XANH ở chế độ sáng. */
+        gold: { DEFAULT: mau('nhan'), light: mau('nhan-sang'), dark: mau('nhan-dam') },
 
-        // Chiều sâu — thay cho chàm/tím.
-        sapphire: { DEFAULT: '#1B3A5C', deep: '#102439', light: '#2E5C8A' },
+        sapphire: { DEFAULT: mau('lam'), deep: mau('lam-sau'), light: mau('lam-nhat') },
+        platinum: { DEFAULT: mau('bach-kim'), dim: mau('bach-kim-mo') },
+        tech: { DEFAULT: mau('lam-ky-thuat'), dim: mau('lam-ky-thuat-mo') },
 
-        // Kim loại — chữ phụ, đường viền nhấn.
-        platinum: { DEFAULT: '#9AAAB8', dim: '#6E7C8A' },
+        layer: {
+          1: mau('nhan'),
+          2: mau('lam-ky-thuat'),
+          3: mau('bach-kim'),
+          4: mau('tot'),
+          5: mau('canh'),
+        },
 
-        // Lam kỹ thuật — dữ liệu, liên kết, trạng thái đang chạy.
-        tech: { DEFAULT: '#5B9BD5', dim: '#3E6E99' },
-
-        // Tầng thông tin: bốn tông cùng họ, không còn cầu vồng.
-        layer: { 1: '#C9A84C', 2: '#5B9BD5', 3: '#9AAAB8', 4: '#57C48F', 5: '#DDB05C' },
+        ok: mau('tot'),
+        warn: mau('canh'),
+        err: mau('loi'),
 
         /**
-         * @deprecated Tên cũ theo "luân xa". KHÔNG dùng cho chỗ mới — hãy dùng
-         * `sapphire` / `gold` / `tech`.
-         * Vẫn giữ vì 8 tệp đang dùng lớp `chakra-6` / `chakra-7`; gỡ thẳng thì
-         * Tailwind lặng lẽ bỏ qua lớp không khai và giao diện mất màu mà không
-         * báo gì. Nay trỏ sang bảng màu mới nên những chỗ đó tự đổi theo.
+         * Lớp phủ đường viền. Ở chế độ tối là trắng mờ, ở chế độ sáng phải là
+         * ĐEN mờ — để nguyên trắng thì viền biến mất hẳn trên nền ngọc trai.
+         * Đây đúng là loại "lỗi màu khi chuyển chế độ" chairman nhắc tới.
+         */
+        w: {
+          4: 'rgb(var(--m-phu) / 0.04)',
+          6: 'rgb(var(--m-phu) / 0.06)',
+          8: 'rgb(var(--m-phu) / 0.08)',
+          12: 'rgb(var(--m-phu) / 0.12)',
+          16: 'rgb(var(--m-phu) / 0.16)',
+        },
+
+        /**
+         * @deprecated Tên cũ theo "luân xa" — dùng `sapphire`/`gold`/`tech` cho
+         * chỗ mới. Giữ lại vì 8 tệp còn dùng; gỡ thẳng thì Tailwind lặng lẽ bỏ
+         * qua lớp không khai và giao diện mất màu mà không báo gì.
          */
         chakra: {
           6: {
-            DEFAULT: '#2E5C8A', // sapphire.light
-            deep: '#102439',
-            glow: '#5B9BD5',
-            light: '#9AAAB8',
+            DEFAULT: mau('lam-nhat'),
+            deep: mau('lam-sau'),
+            glow: mau('lam-ky-thuat'),
+            light: mau('bach-kim'),
           },
           7: {
-            DEFAULT: '#C9A84C', // gold
-            violet: '#DFC584',
-            crown: '#F4F1EA',
-            gold: '#DFC584',
+            DEFAULT: mau('nhan'),
+            violet: mau('nhan-sang'),
+            crown: mau('nga'),
+            gold: mau('nhan-sang'),
           },
-        },
-
-        // Trạng thái — đã giảm rực cho hợp bảng số liệu.
-        ok: '#57C48F',
-        warn: '#DDB05C',
-        err: '#DC8080',
-
-        w: {
-          4: 'rgba(255,255,255,.04)',
-          6: 'rgba(255,255,255,.06)',
-          8: 'rgba(255,255,255,.08)',
-          12: 'rgba(255,255,255,.12)',
-          16: 'rgba(255,255,255,.16)',
         },
       },
       // MỘT PHÔNG DUY NHẤT: Noto Sans (lệnh chairman 20/09/2026).
