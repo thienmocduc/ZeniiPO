@@ -1,14 +1,20 @@
 import type { ReactNode } from 'react';
 
 /**
- * Minimal auth layout — full-screen centered card. Pure form surface,
- * no logo, no mantra footer, no decorative glows. The cosmos background
- * already lives in the root layout so the page is far from blank.
+ * Khung các màn hình xác thực — một thẻ ở giữa màn hình.
+ *
+ * LỖI ĐÃ SỬA (20/09/2026): bản cũ dùng `items-center` kèm `overflow-hidden`.
+ * Khi thẻ cao hơn màn hình (màn hình đăng nhập có thêm nút, hoặc máy có cửa sổ
+ * thấp), phần trên bị đẩy ra ngoài vùng nhìn thấy VÀ `overflow-hidden` chặn
+ * luôn việc cuộn lên — người dùng mất hẳn tiêu đề, không cách nào với tới.
+ *
+ * Cách đúng: `my-auto` — còn chỗ thì căn giữa, hết chỗ thì cư xử như lề bình
+ * thường và trang cuộn được. Không chặn cuộn dọc ở khung ngoài.
  */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <main className="relative min-h-screen w-full flex items-center justify-center px-4 py-10 md:py-14 overflow-hidden">
-      <div className="w-full max-w-[540px] z-10">{children}</div>
+    <main className="relative flex min-h-screen w-full justify-center overflow-x-hidden px-4 py-8">
+      <div className="z-10 my-auto w-full max-w-[420px]">{children}</div>
     </main>
   );
 }

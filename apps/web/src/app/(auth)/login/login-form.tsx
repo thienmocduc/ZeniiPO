@@ -39,7 +39,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { oauthDaBat } from '@/lib/zeni/oauth';
-import { KHOA, docGhiNho, luuGhiNho, xoaGhiNho } from '@/lib/zeni/ghi-nho';
+import { KHOA, docGhiNho, luuGhiNho } from '@/lib/zeni/ghi-nho';
 import { PhoneForm } from './phone-form';
 
 /** Logo Google đúng 4 màu — dùng chữ "G" tự vẽ là vi phạm quy chuẩn thương hiệu. */
@@ -172,35 +172,24 @@ export function LoginForm() {
   }
 
   const inputCls =
-    'w-full bg-panel-2 border border-w-12 focus:border-gold focus:outline-none rounded px-4 py-3 text-ivory placeholder:text-ink-dim transition';
+    'w-full bg-panel-2 border border-w-12 focus:border-gold focus:outline-none rounded px-4 py-2.5 text-ivory placeholder:text-ink-dim transition';
   const labelCls =
-    'block font-mono uppercase text-2xs tracking-widest text-ink-2 mb-2';
+    'block font-mono uppercase text-2xs tracking-widest text-ink-2 mb-1.5';
 
   return (
-    <div className="bg-panel/80 backdrop-blur-xl border border-w-12 rounded-card p-8 shadow-[0_20px_80px_rgba(0,0,0,0.5)]">
-      <header className="mb-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 text-gold-light">
-          <LogIn size={22} />
+    <div className="rounded-card border border-w-12 bg-panel/80 p-6 shadow-[0_20px_80px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+      {/* Đầu thẻ gọn: một dòng tên, một dòng nói rõ đây là Zeni ID. Bản trước
+          có huy hiệu to + đoạn giới thiệu hai dòng, đẩy thẻ cao quá màn hình. */}
+      <header className="mb-5 text-center">
+        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gold/15 text-gold-light">
+          <LogIn size={18} />
         </div>
-        <h1 className="font-display text-3xl text-ivory leading-tight">
+        <h1 className="font-display text-2xl leading-tight text-ivory">
           Đăng nhập <span className="italic text-gold-light">Zeniipo</span>
         </h1>
-
-        {/* Chairman nhìn màn hình và nói "không có đăng nhập Zeni ID" — trong khi
-            chính ô email/mật khẩu này LÀ đăng nhập Zeni ID (mật khẩu do
-            zenicloud.io xác thực, ZeniIPO không giữ). Lỗi là em chỉ ghi điều đó
-            bằng một dòng chữ nhỏ in nghiêng. Nói thẳng ra bằng một dấu hiệu
-            nhìn thấy được. */}
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-3 py-1">
-          <ShieldCheck size={13} className="text-gold-light" />
-          <span className="font-mono text-2xs uppercase tracking-widest text-gold-light">
-            Đăng nhập bằng Zeni ID
-          </span>
-        </div>
-
-        <p className="mt-3 font-serif italic text-ink-2 text-sm">
-          Một tài khoản dùng chung cho cả hệ sinh thái Zeni. Dữ liệu mỗi tổ chức
-          tách biệt hoàn toàn.
+        <p className="mt-1.5 flex items-center justify-center gap-1.5 text-xs text-ink-2">
+          <ShieldCheck size={12} className="text-gold-light" />
+          Bằng <span className="text-gold-light">Zeni ID</span> — một tài khoản cho cả hệ sinh thái
         </p>
       </header>
 
@@ -211,57 +200,13 @@ export function LoginForm() {
           "đang chờ kết nối" — người dùng thấy được lộ trình mà không ai bấm phải
           một đường dẫn ném họ sang tên miền khác.
           Bật thật = đặt NEXT_PUBLIC_ZENI_OAUTH=1 khi ZeniCloud cấp khoá. */}
-      <div className="mb-6 space-y-3">
-        {NHA_CUNG_CAP.map(({ ma, ten, Logo, choLyDo }) => {
-          const sanSang = oauthDaBat() && !choLyDo;
-          return sanSang ? (
-            <a
-              key={ma}
-              href={`/api/auth/zeni/oauth/${ma}?redirect=${encodeURIComponent(redirect)}`}
-              data-testid={`oauth-${ma}`}
-              className="flex w-full items-center justify-center gap-3 rounded border border-w-12 bg-panel-2 px-8 py-3 font-medium text-ivory transition hover:border-gold/50 hover:bg-panel"
-            >
-              <Logo />
-              Tiếp tục với {ten}
-            </a>
-          ) : (
-            <button
-              key={ma}
-              type="button"
-              disabled
-              aria-disabled="true"
-              data-testid={`oauth-${ma}-cho`}
-              title={choLyDo ?? 'Đang chờ Zeni Cloud cấp khoá kết nối'}
-              className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded border border-dashed border-w-12 bg-panel-2/40 px-8 py-3 font-medium text-ink-dim"
-            >
-              <span className="opacity-40">
-                <Logo />
-              </span>
-              Tiếp tục với {ten}
-              <span className="rounded-full border border-w-12 px-2 py-0.5 font-mono text-2xs uppercase tracking-wider">
-                đang chờ
-              </span>
-            </button>
-          );
-        })}
-        <p className="text-center text-2xs text-ink-dim">
-          Các cách đăng nhập trên đang chờ Zeni Cloud cấp khoá kết nối. Trong lúc
-          đó, dùng Zeni ID bên dưới — đầy đủ chức năng.
-        </p>
-      </div>
-
-      <div className="mb-6 flex items-center gap-4">
-        <span className="h-px flex-1 bg-w-12" />
-        <span className="font-mono text-2xs uppercase tracking-widest text-ink-dim">hoặc</span>
-        <span className="h-px flex-1 bg-w-12" />
-      </div>
 
       {/* Mất mạng thì nói ngay, đừng để người dùng bấm rồi chờ hết giờ mới biết. */}
       {mangOffline && (
         <div
           role="status"
           data-testid="mat-mang"
-          className="mb-5 flex items-center gap-2 rounded border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-warn"
+          className="mb-4 flex items-center gap-2 rounded border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn"
         >
           <WifiOff size={16} />
           Máy bạn đang mất kết nối mạng — nối lại rồi hãy đăng nhập.
@@ -274,7 +219,7 @@ export function LoginForm() {
           type="button"
           onClick={dungEmailCuoi}
           data-testid="email-lan-truoc"
-          className="mb-5 flex w-full items-center justify-between gap-3 rounded border border-gold/25 bg-gold/5 px-4 py-3 text-left transition hover:border-gold/50 hover:bg-gold/10"
+          className="mb-4 flex w-full items-center justify-between gap-3 rounded border border-gold/25 bg-gold/5 px-4 py-2.5 text-left transition hover:border-gold/50 hover:bg-gold/10"
         >
           <span className="min-w-0">
             <span className="block font-mono text-2xs uppercase tracking-widest text-ink-dim">
@@ -289,7 +234,7 @@ export function LoginForm() {
       {/* Hai cách vào cùng một tài khoản Zeni ID. Đăng nhập bằng số điện thoại
           là đường có sẵn của nền tảng (SMS OTP) — với doanh nhân Việt thì đây là
           cách quen tay hơn cả. */}
-      <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg border border-w-12 bg-panel-2 p-1">
+      <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg border border-w-12 bg-panel-2 p-1">
         {(
           [
             { ma: 'email', chu: 'Email', Icon: Mail },
@@ -301,7 +246,7 @@ export function LoginForm() {
             type="button"
             onClick={() => setCach(ma)}
             aria-pressed={cach === ma}
-            className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition ${
+            className={`flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition ${
               cach === ma ? 'bg-gold text-bg' : 'text-ink-2 hover:text-ivory'
             }`}
           >
@@ -323,14 +268,14 @@ export function LoginForm() {
           // vai trò đó vào MỌI trang, luôn hiện (ẩn 1px) và rỗng chữ — test dò
           // như vậy sẽ XANH kể cả khi form không hề gửi đi. Đã dính 20/09/2026.
           data-testid="loi-dang-nhap"
-          className="mb-5 rounded border border-err/40 bg-err/10 px-4 py-3 text-sm text-err"
+          className="mb-4 rounded border border-err/40 bg-err/10 px-3 py-2 text-sm text-err"
         >
           {authError}
         </div>
       )}
 
       {/* `onSubmit` của form ⇒ gõ Enter cũng đăng nhập được (bản cũ không) */}
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <div>
           <label htmlFor="email" className={labelCls}>
             Email
@@ -401,7 +346,7 @@ export function LoginForm() {
           type="submit"
           id="loginBtn"
           disabled={isSubmitting}
-          className="w-full bg-gold text-bg px-8 py-3 rounded font-semibold hover:bg-gold-light transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+          className="inline-flex w-full items-center justify-center gap-2 rounded bg-gold px-8 py-2.5 font-semibold text-bg transition hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting && <Loader2 className="animate-spin" size={18} />}
           {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập bằng Zeni ID'}
@@ -410,26 +355,57 @@ export function LoginForm() {
         </>
       )}
 
-      {/* Đăng ký là NÚT viền, không phải chữ nhỏ lẫn vào chú thích.
-          Chairman nhìn màn hình cũ và hỏi "web độc lập thì phải có trường đăng
-          ký chứ?" — trường đó vẫn luôn có, chỉ là trình bày mờ tới mức không
-          thấy. Người dùng mới là nhóm đọc màn hình này kỹ nhất. */}
-      <div className="mt-8 border-t border-w-12 pt-6 text-center">
-        <p className="mb-3 text-sm text-ink-2">Chưa có tài khoản?</p>
+      {/* CÁCH KHÁC — xếp DƯỚI form chính và để gọn, học cách zenicloud.io bày:
+          đây chỉ là đường liên kết tài khoản, không phải nhân vật chính.
+          Bản trước để hai nút to đùng nằm TRÊN cùng, đẩy form xuống và làm thẻ
+          cao quá màn hình. */}
+      <div className="mt-6 border-t border-w-12 pt-5">
+        <p className="mb-3 text-center font-mono text-2xs uppercase tracking-widest text-ink-dim">
+          hoặc
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {NHA_CUNG_CAP.map(({ ma, ten, Logo, choLyDo }) => {
+            const sanSang = oauthDaBat() && !choLyDo;
+            return sanSang ? (
+              <a
+                key={ma}
+                href={`/api/auth/zeni/oauth/${ma}?redirect=${encodeURIComponent(redirect)}`}
+                data-testid={`oauth-${ma}`}
+                className="flex items-center justify-center gap-2 rounded border border-w-12 bg-panel-2 px-3 py-2 text-sm text-ivory transition hover:border-gold/50"
+              >
+                <Logo />
+                {ten}
+              </a>
+            ) : (
+              <button
+                key={ma}
+                type="button"
+                disabled
+                aria-disabled="true"
+                data-testid={`oauth-${ma}-cho`}
+                title={choLyDo ?? 'Đang chờ Zeni Cloud cấp khoá kết nối'}
+                className="flex cursor-not-allowed items-center justify-center gap-2 rounded border border-dashed border-w-12 px-3 py-2 text-sm text-ink-dim"
+              >
+                <span className="opacity-40">
+                  <Logo />
+                </span>
+                {ten}
+                <span className="font-mono text-2xs uppercase tracking-wide">· đang chờ</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Đăng ký: một dòng gọn nhưng vẫn là nút bấm được rõ ràng. */}
+      <p className="mt-5 text-center text-sm text-ink-2">
+        Chưa có tài khoản?{' '}
         <Link
           href="/signup"
-          className="inline-flex w-full items-center justify-center rounded border border-gold/50 px-8 py-3 font-semibold text-gold-light transition hover:border-gold hover:bg-gold/10"
+          className="font-semibold text-gold-light underline underline-offset-4 transition hover:text-gold"
         >
           Đăng ký miễn phí
         </Link>
-      </div>
-
-      <p className="mt-5 text-center text-2xs leading-relaxed text-ink-dim">
-        Đăng ký ngay tại đây — <strong className="text-ink-2">không cần</strong> có sẵn
-        tài khoản ở sản phẩm Zeni nào khác. Tài khoản tạo ra là một{' '}
-        <strong className="text-ink-2">Zeni ID</strong>, dùng chung được cho mọi sản phẩm
-        Zeni Holdings (zenicloud.io · ZeniIPO · Zeni Digital). Tổ chức và vai trò của bạn
-        được lấy tự động từ hồ sơ — không cần chọn khi đăng nhập.
       </p>
     </div>
   );

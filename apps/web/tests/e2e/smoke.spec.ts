@@ -32,8 +32,8 @@ test.describe('Smoke · public surface', () => {
     await expect(nut).toBeVisible()
     await expect(nut).toContainText(/Đăng ký/i)
 
-    // Và phải nói thẳng: KHÔNG cần có sẵn tài khoản ở sản phẩm Zeni khác.
-    await expect(page.locator('body')).toContainText(/không cần/i)
+    // Và phải nói rõ đây là Zeni ID — một tài khoản cho cả hệ sinh thái.
+    await expect(page.locator('body')).toContainText(/Zeni ID/i)
   })
 
   test('bấm Đăng ký sang được trang tạo tài khoản thật', async ({ page }) => {
@@ -123,8 +123,8 @@ test.describe('Smoke · public surface', () => {
     // Và không có phiên bản bấm được nào lọt ra cùng lúc.
     await expect(page.getByTestId('oauth-google')).toHaveCount(0)
 
-    // Người dùng phải được chỉ sang đường đi được ngay, không bị bỏ lửng.
-    await expect(page.locator('body')).toContainText(/dùng Zeni ID bên dưới/i)
+    // Và cách đăng nhập đang dùng được phải nằm ngay đó, không bị bỏ lửng.
+    await expect(page.locator('button[type="submit"]').first()).toBeVisible()
   })
 
   test('nhớ email lần trước + nhớ cách đăng nhập quen', async ({ page }) => {
