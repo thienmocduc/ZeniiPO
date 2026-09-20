@@ -463,6 +463,11 @@ export function rewriteSidebarForNextLinks(
     // nên trên production `plan_versions` = 0: engine chưa chạy thật lần nào
     // và hợp đồng ba tầng gửi ZeniOS/ZeniERP chưa có gì để gửi.
     { route: 'plan', page: 'plan', ic: '▤', tx: 'Kế hoạch tài chính', pill: '<span class="pill new">3 BÁO CÁO</span>' },
+    // Sẵn sàng niêm yết — nơi đính hồ sơ bằng chứng. Migration 038 đã tách
+    // điểm "đã xác minh" khỏi điểm "tự khai" và chặn ở CSDL, nhưng
+    // /api/readiness/compute và /api/readiness/criteria/[id] chưa có dòng giao
+    // diện nào gọi tới, nên cả cơ chế đó nằm im không ai dùng được.
+    { route: 'readiness', page: 'readiness', ic: '◎', tx: 'Sẵn sàng niêm yết', pill: '<span class="pill new">BƯỚC 8</span>' },
     // Hai trang này có chức năng thật (xuất nhật ký kiểm toán, đổi mật khẩu &
     // xác thực hai bước) nhưng KHÔNG có href nào trỏ tới — người dùng chỉ vào
     // được nếu gõ tay URL.
