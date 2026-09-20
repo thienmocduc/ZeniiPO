@@ -18,7 +18,8 @@ export const runtime = 'nodejs'
  * Stage suy từ round gần nhất nếu client không truyền.
  */
 
-const StageSchema = z.enum(['seed', 'series_a', 'series_b', 'growth', 'pre_ipo'])
+// 'niem_yet' mở từ migration 041: nền tảng không dừng ở cửa sàn.
+const StageSchema = z.enum(['seed', 'series_a', 'series_b', 'growth', 'pre_ipo', 'niem_yet'])
 type Stage = z.infer<typeof StageSchema>
 
 const BodySchema = z.object({ stage: StageSchema.optional() })
@@ -77,10 +78,25 @@ export async function POST(req: Request) {
   if (grade.error) return NextResponse.json({ error: grade.error.message }, { status: 500 })
   const g = grade.data as {
     stage: string
+    /** Ngành theo hành trình IPO đang hoạt động; null nếu chưa khai. */
+    nganh: string | null
+    co_doanh_thu_dinh_ky: boolean
     passed: number
     measured: number
+    /** Số chỉ số bị bỏ qua vì không hợp mô hình kinh doanh — KHÔNG nằm ở mẫu số. */
+    bo_qua_vi_khong_ap_dung: number
     score_pct: number
-    items: Array<{ metric_code: string; name: string; category: string; actual: number | null; status: string; target: string; note: string }>
+    ghi_chu: string
+    items: Array<{
+      metric_code: string
+      name: string
+      category: string
+      actual: number | null
+      /** pass · fail · missing · khong_ap_dung */
+      status: string
+      target: string | null
+      note: string
+    }>
   }
 
   const items = (g.items ?? []).map((it) => ({
@@ -91,7 +107,20 @@ export async function POST(req: Request) {
   return NextResponse.json({
     data: {
       metrics,
-      benchmark: { stage: g.stage, passed: g.passed, measured: g.measured, score_pct: g.score_pct, items },
+      benchmark: {
+        stage: g.stage,
+        nganh: g.nganh,
+        co_doanh_thu_dinh_ky: g.co_doanh_thu_dinh_ky,
+        passed: g.passed,
+        measured: g.measured,
+        // Chỉ số không hợp mô hình kinh doanh KHÔNG nằm ở mẫu số. Trước đây
+        // một chuỗi nhà hàng bị chấm bằng chuẩn phần mềm (NRR, Rule of 40…)
+        // rồi trượt, kéo điểm xuống vì những thứ họ không thể có.
+        bo_qua_vi_khong_ap_dung: g.bo_qua_vi_khong_ap_dung,
+        score_pct: g.score_pct,
+        ghi_chu: g.ghi_chu,
+        items,
+      },
     },
   })
 }
