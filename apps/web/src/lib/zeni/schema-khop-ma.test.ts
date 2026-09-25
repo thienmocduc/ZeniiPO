@@ -43,11 +43,19 @@ function cotThatCuaBang(): Map<string, Set<string>> {
     }
 
     // Cột thêm sau bằng ALTER TABLE cũng là cột thật.
-    for (const m of sql.matchAll(
-      /ALTER TABLE\s+(?:public\.)?(\w+)\s+ADD COLUMN(?:\s+IF NOT EXISTS)?\s+(\w+)/g,
-    )) {
+    //
+    // ⚠ MỘT LỆNH ALTER CÓ THỂ THÊM NHIỀU CỘT:
+    //     ALTER TABLE subscriptions
+    //       ADD COLUMN IF NOT EXISTS price_id text,
+    //       ADD COLUMN IF NOT EXISTS canceled_at timestamptz,
+    //       ADD COLUMN IF NOT EXISTS tier_code text REFERENCES …;
+    // Bản trước chỉ bắt `ADD COLUMN` ĐẦU TIÊN sau `ALTER TABLE`, nên mất
+    // `canceled_at` và `tier_code` — rồi báo nhầm rằng cột có thật là không
+    // tồn tại. BÁO NHẦM là loại lỗi tệ nhất cho một bộ canh: người ta sẽ tắt
+    // nó đi thay vì sửa. Nay quét từng lệnh tới dấu chấm phẩy.
+    for (const m of sql.matchAll(/ALTER TABLE\s+(?:public\.)?(\w+)([^;]*);/g)) {
       const tap = bang.get(m[1]) ?? new Set<string>();
-      tap.add(m[2]);
+      for (const c of m[2].matchAll(/ADD COLUMN(?:\s+IF NOT EXISTS)?\s+(\w+)/g)) tap.add(c[1]);
       bang.set(m[1], tap);
     }
   }
