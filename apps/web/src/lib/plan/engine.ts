@@ -307,7 +307,16 @@ function computeLine(
     }
     case 'fixed_schedule': {
       const base = assertNonNegative(`${where}.monthly_vnd`, d.monthly_vnd)
-      const g = assertPct(`${where}.growth_pct_m`, d.growth_pct_m ?? 0, -100, 200)
+      // ⚠ NHÂN HỆ SỐ KỊCH BẢN vào tốc độ tăng — giống price_volume, saas_mrr
+      // và cac_driven. Bản trước BỎ SÓT đúng chỗ này, mà `fixed_schedule` lại
+      // là kiểu động lực mặc định và hay dùng nhất: một kế hoạch chỉ gồm các
+      // dòng fixed_schedule cho ra ba kịch bản GIỐNG HỆT NHAU. Giám đốc tài
+      // chính chạy lạc quan/thận trọng thấy y một con số sẽ kết luận mô hình
+      // hỏng, hoặc tệ hơn, tin rằng kế hoạch của mình không nhạy với giả định.
+      //
+      // Phát hiện khi chạy thật đầu-cuối trên production: doanh thu bear =
+      // base = bull = 62.078.651.077đ.
+      const g = assertPct(`${where}.growth_pct_m`, d.growth_pct_m ?? 0, -100, 200) * factor
       let v = base
       for (let m = 0; m < horizon; m++) {
         if (m > 0) v = v * (1 + g / 100)

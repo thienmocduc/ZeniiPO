@@ -262,8 +262,58 @@ describe('ZIPO-103 · kịch bản, độ nhạy, chỉ tiêu', () => {
       scenario_multipliers: { bull: 1.2, bear: 0.8 },
     })
     const all = runAllScenarios(input)
-    expect(all.bull.summary.total_revenue).toBeGreaterThanOrEqual(all.base.summary.total_revenue)
-    expect(all.base.summary.total_revenue).toBeGreaterThanOrEqual(all.bear.summary.total_revenue)
+    // ⚠ PHẢI LÀ LỚN HƠN HẲN, không phải ">=". Bản trước dùng `>=` nên test
+    // vẫn xanh kể cả khi ba kịch bản ra số GIỐNG HỆT NHAU — tức là nó không
+    // canh được đúng thứ nó định canh.
+    expect(all.bull.summary.total_revenue).toBeGreaterThan(all.base.summary.total_revenue)
+    expect(all.base.summary.total_revenue).toBeGreaterThan(all.bear.summary.total_revenue)
+  })
+
+  it('17b. fixed_schedule — kiểu mặc định — CŨNG phải đổi theo kịch bản', () => {
+    // Lỗi thật: `fixed_schedule` không nhân hệ số kịch bản vào tốc độ tăng,
+    // trong khi ba kiểu động lực khác đều nhân. Một kế hoạch chỉ gồm dòng
+    // fixed_schedule cho ra ba kịch bản y hệt nhau — phát hiện khi chạy thật
+    // trên production.
+    const input = basePlan({
+      lines: [
+        {
+          line_id: 'rev',
+          coa_line: COA.REV_GOODS,
+          label_vi: 'Doanh thu dịch vụ',
+          driver: { type: 'fixed_schedule', monthly_vnd: 800_000_000, growth_pct_m: 4 },
+        },
+      ],
+      scenario_multipliers: { bull: 1.2, bear: 0.8 },
+    })
+    const all = runAllScenarios(input)
+    expect(all.bull.summary.total_revenue).toBeGreaterThan(all.base.summary.total_revenue)
+    expect(all.base.summary.total_revenue).toBeGreaterThan(all.bear.summary.total_revenue)
+  })
+
+  it('17c. fixed_schedule KHÔNG có tăng trưởng thì ba kịch bản bằng nhau — đúng vậy', () => {
+    // Không tăng trưởng thì không có gì để nhân hệ số. Chốt lại để lần sau
+    // không ai "sửa" thành nhân vào số gốc: hệ số kịch bản áp lên GIẢ ĐỊNH
+    // TĂNG TRƯỞNG, không áp lên số tiền đã cam kết.
+    const input = basePlan({
+      lines: [
+        {
+          line_id: 'thue',
+          coa_line: COA.OPEX_GA_RENT,
+          label_vi: 'Thuê văn phòng',
+          driver: { type: 'fixed_schedule', monthly_vnd: 30_000_000 },
+        },
+        {
+          line_id: 'rev',
+          coa_line: COA.REV_GOODS,
+          label_vi: 'Doanh thu',
+          driver: { type: 'fixed_schedule', monthly_vnd: 100_000_000 },
+        },
+      ],
+      scenario_multipliers: { bull: 1.2, bear: 0.8 },
+    })
+    const all = runAllScenarios(input)
+    expect(all.bull.summary.total_revenue).toBe(all.base.summary.total_revenue)
+    expect(all.bear.summary.total_revenue).toBe(all.base.summary.total_revenue)
   })
 
   it('18. phân tích độ nhạy trả về danh sách có xếp hạng ảnh hưởng', () => {
