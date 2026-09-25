@@ -65,7 +65,11 @@ export default async function CascadeSuccessPage({
   const { data: objectivesRaw } = await supabase
     .from('okr_objectives')
     .select('id,title,description,tier,progress')
-    .eq('tier', 'CHR')
+    // ⚠ 'chr' viết THƯỜNG. Ràng buộc CSDL là chữ thường
+    // (tier IN ('chr','ceo',…)) và hàm phân rã chèn 'chr' thường. Viết HOA ở
+    // đây làm truy vấn luôn trả 0 dòng, nên trang "phân rã thành công" luôn
+    // trống — người dùng vừa bấm xong đã thấy không có gì.
+    .eq('tier', 'chr')
     .order('created_at', { ascending: false })
     .limit(4);
 

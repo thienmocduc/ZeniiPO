@@ -1,5 +1,10 @@
 import { V1Page } from '@/lib/v1/Page';
+import { V1DataBind } from '@/components/v1-data-bind';
 
 export default function Page() {
-  return <V1Page pageId="team" />;
+  return (
+    <V1DataBind pageId="page-team">
+      <V1Page pageId="team" />
+    </V1DataBind>
+  );
 }

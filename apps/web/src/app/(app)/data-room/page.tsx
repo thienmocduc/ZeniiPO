@@ -1,4 +1,5 @@
 import { V1Page } from '@/lib/v1/Page';
+import { V1DataBind } from '@/components/v1-data-bind';
 
 // TODO(zeniipo): wire to /api/data-room once a list endpoint exists.
 // For now we render the v1_8 static markup unchanged. The dataroom page
@@ -6,5 +7,9 @@ import { V1Page } from '@/lib/v1/Page';
 // even without per-document live data.
 
 export default function Page() {
-  return <V1Page pageId="dataroom" />;
+  return (
+    <V1DataBind pageId="page-dataroom">
+      <V1Page pageId="dataroom" />
+    </V1DataBind>
+  );
 }
