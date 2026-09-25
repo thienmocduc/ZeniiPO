@@ -468,6 +468,10 @@ export function rewriteSidebarForNextLinks(
     // /api/readiness/compute và /api/readiness/criteria/[id] chưa có dòng giao
     // diện nào gọi tới, nên cả cơ chế đó nằm im không ai dùng được.
     { route: 'readiness', page: 'readiness', ic: '◎', tx: 'Sẵn sàng niêm yết', pill: '<span class="pill new">BƯỚC 8</span>' },
+    // Vòng gọi vốn — cổng bước 6. /api/rounds trước đây mồ côi và trang mockup
+    // hiện số tĩnh, nên doanh nghiệp không có cách nào tạo vòng, và cổng
+    // `round_linked` không bao giờ qua được.
+    { route: 'rounds', page: 'rounds', ic: '◈', tx: 'Vòng gọi vốn', pill: '<span class="pill new">BƯỚC 6</span>' },
     // Hai trang này có chức năng thật (xuất nhật ký kiểm toán, đổi mật khẩu &
     // xác thực hai bước) nhưng KHÔNG có href nào trỏ tới — người dùng chỉ vào
     // được nếu gõ tay URL.

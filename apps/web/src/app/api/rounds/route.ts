@@ -29,15 +29,29 @@ const STATUSES = [
  * Tiền ở bảng này ghi bằng USD (`*_usd`) vì vòng gọi vốn quốc tế yết theo USD;
  * đây là ngoại lệ có chủ đích so với quy ước "tiền là BIGINT VND".
  */
+/**
+ * Mã vòng — chép ĐÚNG ràng buộc `fundraise_rounds_round_code_check` của CSDL.
+ *
+ * Trước đây trường này là chuỗi tự do (`safeString.min(1)`) trong khi CSDL chỉ
+ * nhận 10 giá trị: gõ "Series A" hay "seri_a" là nhận lỗi 500 khó hiểu từ
+ * ràng buộc, thay vì một câu báo lỗi nói rõ chọn gì.
+ *
+ * ⚠ Bộ canh lệch lược đồ (`schema-khop-ma.test.ts` test 5) chỉ soi `z.enum`,
+ * nên KHÔNG bắt được trường hợp chuỗi-tự-do-vào-cột-có-CHECK như thế này.
+ */
+const ROUND_CODES = [
+  'pre_seed', 'seed', 'angel', 'series_a', 'series_b',
+  'series_c', 'series_d', 'bridge', 'pre_ipo', 'ipo',
+] as const
+
 const CreateSchema = z.object({
   round_name: safeString.min(1),
-  /** Mã vòng: seed, series_a… Dùng cho đối chiếu và sắp xếp. */
-  round_code: safeString.min(1),
+  round_code: z.enum(ROUND_CODES),
   target_raise_usd: SoTienDuong,
   pre_money_usd: SoTienDuong.optional(),
   status: z.enum(STATUSES).optional(),
-  /** Ngày dự kiến chốt vòng. */
-  target_close_date: safeString.optional(),
+  /** Ngày dự kiến chốt vòng, dạng YYYY-MM-DD. */
+  target_close_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày dạng YYYY-MM-DD').optional(),
   lead_investor: safeString.optional(),
 })
 
