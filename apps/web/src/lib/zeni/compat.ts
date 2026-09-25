@@ -187,9 +187,14 @@ class ZeniQuery<T = any> implements PromiseLike<DbResult<T>> {
   }
 
   // ── compile + run ──────────────────────────────────────────────────
-  private compile(): { text: string; params: unknown[] } {
+  private compile(): { text: string; params: unknown[]; paramCols: (string | null)[] } {
     const params: unknown[] = [];
-    const p = (v: unknown) => { params.push(v); return `$${params.length}`; };
+    // Cột ứng với từng tham số — cần để biết cột đó là jsonb hay mảng Postgres.
+    // Tham số không đến từ một cột (giá trị trong WHERE…) thì để null.
+    const paramCols: (string | null)[] = [];
+    const p = (v: unknown) => { params.push(v); paramCols.push(null); return `$${params.length}`; };
+    /** Như `p` nhưng nhớ tên cột. */
+    const pc = (k: string, v: unknown) => { params.push(v); paramCols.push(k); return `$${params.length}`; };
     const t = `public.${ident(this.table, 'bảng')}`;
     const whereSql = this.filters.length
       ? ` WHERE ${this.filters.map((f) => f.sql(p)).join(' AND ')}`
@@ -210,8 +215,8 @@ class ZeniQuery<T = any> implements PromiseLike<DbResult<T>> {
 
     switch (this.verb) {
       case 'select': {
-        if (this.countHead) return { text: `SELECT count(*)::int AS n FROM ${t}${whereSql}`, params };
-        return { text: `SELECT ${selectList(this.cols)} FROM ${t}${whereSql}${orderSql}${limitSql}`, params };
+        if (this.countHead) return { text: `SELECT count(*)::int AS n FROM ${t}${whereSql}`, params, paramCols };
+        return { text: `SELECT ${selectList(this.cols)} FROM ${t}${whereSql}${orderSql}${limitSql}`, params, paramCols };
       }
       case 'insert':
       case 'upsert': {
@@ -220,7 +225,7 @@ class ZeniQuery<T = any> implements PromiseLike<DbResult<T>> {
         if (keys.length === 0) throw new Error('insert/upsert thiếu cột.');
         const colSql = keys.map((k) => ident(k, 'cột')).join(', ');
         const valuesSql = this.rows
-          .map((r) => `(${keys.map((k) => p(Object.prototype.hasOwnProperty.call(r, k) ? r[k] : null)).join(', ')})`)
+          .map((r) => `(${keys.map((k) => pc(k, Object.prototype.hasOwnProperty.call(r, k) ? r[k] : null)).join(', ')})`)
           .join(', ');
         let conflictSql = '';
         if (this.verb === 'upsert') {
@@ -232,42 +237,109 @@ class ZeniQuery<T = any> implements PromiseLike<DbResult<T>> {
             : ` ON CONFLICT (${conflictCols.join(', ')}) DO NOTHING`;
         }
         const retSql = this.returning ? ` RETURNING ${selectList(this.returning)}` : '';
-        return { text: `INSERT INTO ${t} (${colSql}) VALUES ${valuesSql}${conflictSql}${retSql}`, params };
+        return { text: `INSERT INTO ${t} (${colSql}) VALUES ${valuesSql}${conflictSql}${retSql}`, params, paramCols };
       }
       case 'update': {
         if (!this.setObj || Object.keys(this.setObj).length === 0) throw new Error('update thiếu dữ liệu.');
         if (this.filters.length === 0) throw new Error(`update ${this.table} không có WHERE — chặn để an toàn.`);
         const setSql = Object.entries(this.setObj)
-          .map(([k, v]) => `${ident(k, 'cột')} = ${p(v)}`)
+          .map(([k, v]) => `${ident(k, 'cột')} = ${pc(k, v)}`)
           .join(', ');
         const retSql = this.returning ? ` RETURNING ${selectList(this.returning)}` : '';
-        return { text: `UPDATE ${t} SET ${setSql}${whereSql}${retSql}`, params };
+        return { text: `UPDATE ${t} SET ${setSql}${whereSql}${retSql}`, params, paramCols };
       }
       case 'delete': {
         if (this.filters.length === 0) throw new Error(`delete ${this.table} không có WHERE — chặn để an toàn.`);
         const retSql = this.returning ? ` RETURNING ${selectList(this.returning)}` : '';
-        return { text: `DELETE FROM ${t}${whereSql}${retSql}`, params };
+        return { text: `DELETE FROM ${t}${whereSql}${retSql}`, params, paramCols };
       }
       default:
         throw new Error(`Query ${this.table} chưa có verb (select/insert/update/upsert/delete).`);
     }
   }
 
-  /** JSON hoá object/array thuần cho cột jsonb (pg tự lo Date/Buffer/null). */
-  private static normalizeParam(v: unknown): unknown {
-    if (v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && !Buffer.isBuffer(v)) {
-      return JSON.stringify(v);
-    }
-    if (Array.isArray(v) && v.some((x) => x && typeof x === 'object' && !(x instanceof Date))) {
-      return JSON.stringify(v);
+  /**
+   * JSON hoá giá trị cho cột jsonb (pg tự lo Date/Buffer/null).
+   *
+   * ⚠ PHẢI BIẾT KIỂU CỘT. Bản cũ chỉ đoán theo hình dạng giá trị: object thì
+   * JSON hoá, mảng thì JSON hoá KHI có phần tử là object. Hệ quả: một mảng
+   * chuỗi thuần như `["a","b"]` lọt xuống nguyên dạng, node-postgres dựng nó
+   * thành MẢNG POSTGRES `{a,b}`, và cột jsonb từ chối —
+   * `invalid input syntax for type json`.
+   *
+   * Lỗi đó làm hỏng MỌI chỗ ghi mảng giá trị đơn vào cột jsonb, phát hiện khi
+   * khách thật lưu một khối mô hình kinh doanh (`canvas_blocks.items`).
+   *
+   * Và KHÔNG được JSON hoá tất cả mảng: CSDL có 11 cột mảng Postgres thật
+   * (`org_positions.decision_rights`, `connector_mappings.dedupe_keys`…) mà
+   * ứng dụng đang ghi — JSON hoá chúng là làm hỏng chiều ngược lại.
+   */
+  private static normalizeParam(v: unknown, kieuCot?: string): unknown {
+    if (v === null || v === undefined) return v;
+    const laJson = kieuCot === 'jsonb' || kieuCot === 'json';
+
+    if (v instanceof Date || Buffer.isBuffer(v)) return v;
+
+    if (laJson) return typeof v === 'object' ? JSON.stringify(v) : v;
+
+    // Không biết kiểu cột (tham số trong WHERE, hoặc bảng chưa tra được):
+    // giữ nguyên cách đoán cũ, vốn đúng cho object và mảng-chứa-object.
+    if (kieuCot === undefined) {
+      if (typeof v === 'object' && !Array.isArray(v)) return JSON.stringify(v);
+      if (Array.isArray(v) && v.some((x) => x && typeof x === 'object' && !(x instanceof Date))) {
+        return JSON.stringify(v);
+      }
     }
     return v;
   }
 
+  /**
+   * Kiểu dữ liệu từng cột, tra một lần cho mỗi bảng rồi nhớ lại.
+   *
+   * Tra ở tầng này thay vì khai cứng danh sách cột jsonb: danh sách khai tay
+   * sẽ lệch ngay lần migration sau, và lệch âm thầm.
+   */
+  private static kieuCotTheoBang = new Map<string, Map<string, string>>();
+
+  private static async layKieuCot(table: string, runner: Runner): Promise<Map<string, string>> {
+    const daCo = ZeniQuery.kieuCotTheoBang.get(table);
+    if (daCo) return daCo;
+    try {
+      const res = await runner(async (exec) =>
+        exec(
+          `SELECT column_name, data_type FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = $1`,
+          [table],
+        ),
+      );
+      const m = new Map<string, string>(
+        (res.rows as Array<{ column_name: string; data_type: string }>).map((r) => [
+          r.column_name,
+          r.data_type,
+        ]),
+      );
+      ZeniQuery.kieuCotTheoBang.set(table, m);
+      return m;
+    } catch {
+      // Tra không được thì trả map rỗng ⇒ quay về cách đoán cũ. Không chặn
+      // câu lệnh chỉ vì không đọc được lược đồ.
+      const m = new Map<string, string>();
+      ZeniQuery.kieuCotTheoBang.set(table, m);
+      return m;
+    }
+  }
+
   private async run(): Promise<DbResult<T>> {
     try {
-      const { text, params } = this.compile();
-      const norm = params.map(ZeniQuery.normalizeParam);
+      const { text, params, paramCols } = this.compile();
+      // Chỉ tra lược đồ khi có tham số gắn với cột (tức là lệnh GHI).
+      const kieu = paramCols.some((c) => c !== null)
+        ? await ZeniQuery.layKieuCot(this.table, this.runner)
+        : null;
+      const norm = params.map((v, i) => {
+        const col = paramCols[i];
+        return ZeniQuery.normalizeParam(v, col && kieu ? kieu.get(col) : undefined);
+      });
       const res = await this.runner(async (exec) => exec(text, norm));
       if (this.countHead) {
         return { data: null, error: null, count: (res.rows[0]?.n as number) ?? 0 } as unknown as DbResult<T>;
