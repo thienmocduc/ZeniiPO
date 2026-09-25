@@ -6,6 +6,32 @@ import type { PlanInput, PlanLine, Driver } from './engine'
  * plan_assumptions + tax_rates). Fail-closed: thiếu dữ liệu → trả lỗi rõ ràng,
  * KHÔNG tự điền giá trị mặc định cho những thứ mang tính giả định kinh doanh.
  */
+/**
+ * Đưa một giá trị ngày của Postgres về chuỗi ISO 'YYYY-MM-DD'.
+ *
+ * ⚠ CỘT `date` TRẢ VỀ LÀ ĐỐI TƯỢNG Date, KHÔNG PHẢI CHUỖI. node-postgres tự
+ * phân giải `date`/`timestamp` thành `Date` của JavaScript. Bản trước viết
+ * `String(version.start_period).slice(0, 7)` — với một `Date` thì
+ * `String()` cho ra "Thu Oct 01 2026 …" và cắt 7 ký tự đầu ra **"Thu Oct"**.
+ * Engine từ chối ngay, nên kế hoạch KHÔNG BAO GIỜ chạy được từ CSDL.
+ *
+ * Lỗi này chỉ lộ ra khi chạy với CSDL thật: test dùng bản giả truyền chuỗi
+ * '2026-01-01' nên vẫn xanh. Bản giả mô tả sai kiểu dữ liệu thì test chỉ kiểm
+ * được cái bản giả, không kiểm được hệ thống.
+ */
+function ngayISO(v: unknown): string {
+  if (v instanceof Date) {
+    // Dùng thành phần theo GIỜ ĐỊA PHƯƠNG: node-postgres dựng `date` thành
+    // nửa đêm giờ địa phương, `toISOString()` sẽ lùi về ngày hôm trước ở múi
+    // giờ dương như Việt Nam (UTC+7).
+    const y = v.getFullYear()
+    const m = String(v.getMonth() + 1).padStart(2, '0')
+    const d = String(v.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  return String(v ?? '')
+}
+
 export async function buildPlanInput(
   supabase: ZeniClient,
   versionId: string,
@@ -85,7 +111,7 @@ export async function buildPlanInput(
     .from('tax_rates')
     .select('rate_pct, effective_from')
     .eq('tax_code', 'cit_vn')
-    .lte('effective_from', String(version.start_period))
+    .lte('effective_from', ngayISO(version.start_period))
     .order('effective_from', { ascending: false })
     .limit(1)
   const taxRate = Number(taxRows?.[0]?.rate_pct ?? A.get('tax_rate_pct') ?? 20)
@@ -93,7 +119,7 @@ export async function buildPlanInput(
   return {
     ok: true,
     input: {
-      start_period: String(version.start_period).slice(0, 7),
+      start_period: ngayISO(version.start_period).slice(0, 7),
       horizon_months: Number(version.horizon_months),
       lines,
       working_capital: {

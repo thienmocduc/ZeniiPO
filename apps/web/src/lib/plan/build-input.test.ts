@@ -147,3 +147,65 @@ describe('Dựng đầu vào kế hoạch từ CSDL', () => {
     expect(r.input.capex).toBeUndefined()
   })
 })
+
+describe('Ngày từ CSDL là đối tượng Date, không phải chuỗi', () => {
+  it('6. cột `date` trả về Date ⇒ vẫn ra "YYYY-MM", không ra "Thu Oct"', async () => {
+    // Đây là lỗi thật: node-postgres phân giải `date` thành Date của JS, và
+    // `String(date).slice(0,7)` cho ra "Thu Oct". Engine từ chối, nên kế hoạch
+    // KHÔNG BAO GIỜ chạy được từ CSDL — chỉ lộ ra khi chạy với dữ liệu thật,
+    // vì bản giả trước đây truyền chuỗi nên test vẫn xanh.
+    const r = await buildPlanInput(
+      clientGia({
+        plan_versions: [{ ...banKeHoach, start_period: new Date(2026, 9, 1) }], // tháng 10/2026
+        plan_lines: [
+          { id: 'l1', coa_line: '5111', label_vi: 'Doanh thu', company_id: null,
+            driver_type: 'fixed_schedule', driver_config: { monthly_vnd: 100_000_000 } },
+        ],
+        plan_assumptions: [],
+        tax_rates: [],
+      }),
+      'v1',
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.input.start_period).toBe('2026-10')
+  })
+
+  it('7. ngày 01 tháng bất kỳ KHÔNG bị lùi về tháng trước vì múi giờ', async () => {
+    // Việt Nam là UTC+7: `toISOString()` trên nửa đêm giờ địa phương sẽ ra
+    // ngày HÔM TRƯỚC. Ngày 01/01 mà lùi thành 31/12 là lệch cả một năm kế hoạch.
+    const r = await buildPlanInput(
+      clientGia({
+        plan_versions: [{ ...banKeHoach, start_period: new Date(2027, 0, 1) }],
+        plan_lines: [
+          { id: 'l1', coa_line: '5111', label_vi: 'Doanh thu', company_id: null,
+            driver_type: 'fixed_schedule', driver_config: { monthly_vnd: 1 } },
+        ],
+        plan_assumptions: [],
+        tax_rates: [],
+      }),
+      'v1',
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.input.start_period).toBe('2027-01')
+  })
+
+  it('8. chuỗi vẫn chạy như cũ (một số nơi truyền chuỗi sẵn)', async () => {
+    const r = await buildPlanInput(
+      clientGia({
+        plan_versions: [{ ...banKeHoach, start_period: '2026-03-01' }],
+        plan_lines: [
+          { id: 'l1', coa_line: '5111', label_vi: 'Doanh thu', company_id: null,
+            driver_type: 'fixed_schedule', driver_config: { monthly_vnd: 1 } },
+        ],
+        plan_assumptions: [],
+        tax_rates: [],
+      }),
+      'v1',
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.input.start_period).toBe('2026-03')
+  })
+})
