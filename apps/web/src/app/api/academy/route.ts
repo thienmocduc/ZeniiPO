@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { kiemQuyen } from '@/lib/goi/han-muc'
 import { createServerClient } from '@/lib/supabase/server'
 import { requireUserAndTenant } from '@/lib/api/tenant'
 
@@ -17,6 +18,16 @@ export async function GET(req: Request) {
   const level = Number(url.searchParams.get('level') ?? '1')
   if (!Number.isInteger(level) || level < 1 || level > 7) {
     return NextResponse.json({ error: 'level must be 1–7' }, { status: 400 })
+  }
+
+  // Học viện chỉ mở từ gói Explorer trở lên — giới hạn này `membership_tiers`
+  // đã khai từ lâu (`academy_access`) nhưng trước migration 044 không ai đọc.
+  const quyen = await kiemQuyen(supabase, auth.tenantId, 'hoc_vien')
+  if (!quyen.ok) {
+    return NextResponse.json(
+      { error: quyen.message, goi_hien_tai: quyen.goi, can_nang_len: quyen.can_goi },
+      { status: quyen.status },
+    )
   }
 
   const [lessons, assessment, specs] = await Promise.all([

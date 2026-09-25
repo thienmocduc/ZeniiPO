@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { kiemQuyen } from '@/lib/goi/han-muc'
 import { z } from 'zod'
 import { SoTienDuong } from '@/lib/tien/so-tien'
 import { createServerClient } from '@/lib/supabase/server'
@@ -59,6 +60,17 @@ export async function POST(req: Request) {
     const tenantId = await getCurrentTenantId(supabase, user.id)
     if (!tenantId) {
       return NextResponse.json({ error: 'No tenant for user' }, { status: 403 })
+    }
+
+    // Giới hạn số hành trình theo gói. Gói Trải nghiệm cho 1, Pro cho 3…
+    // Trả 402 kèm gói cần nâng, để giao diện hiện nút nâng gói chứ không báo
+    // "bạn không có quyền" (đó là chuyện khác hẳn).
+    const quyen = await kiemQuyen(supabase, tenantId, 'tao_hanh_trinh')
+    if (!quyen.ok) {
+      return NextResponse.json(
+        { error: quyen.message, goi_hien_tai: quyen.goi, can_nang_len: quyen.can_goi },
+        { status: quyen.status },
+      )
     }
 
     const { data, error } = await supabase
