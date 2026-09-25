@@ -13,7 +13,7 @@ export const runtime = 'nodejs'
  * sửa quy mô khoản đầu tư đều trả lỗi 500.
  */
 const UpdateSchema = z.object({
-  stage: safeString.optional(),
+  stage: z.enum(['outreach', 'intro', 'meeting', 'pitch', 'follow_up', 'term_sheet', 'due_diligence', 'signed', 'wired', 'closed', 'passed', 'ghosted']).optional(),
   /** Quy mô khoản dự kiến, ĐÔ LA NGUYÊN (cột CSDL là bigint). */
   target_check_usd: SoTien.optional(),
   committed_usd: SoTien.optional(),

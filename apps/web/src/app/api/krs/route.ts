@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 const CreateSchema = z.object({
   objective_id: safeUuid,
   title: safeString.min(1),
-  metric_type: safeString.min(1),
+  metric_type: z.enum(['number', 'percentage', 'boolean', 'milestone']),
   target_value: z.number(),
 })
 

@@ -11,7 +11,7 @@ const CreateSchema = z.object({
   title: safeString.min(1),
   kr_id: safeUuid.optional().nullable(),
   assignee_id: safeUuid.optional().nullable(),
-  priority: safeString.optional(),
+  priority: z.enum(['t1', 't2', 't3']).optional(),
   due_date: safeString.optional(),
 })
 

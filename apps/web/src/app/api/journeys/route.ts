@@ -12,7 +12,7 @@ export const runtime = 'nodejs'
 const CreateSchema = z.object({
   name: safeString.min(1),
   valuation_target: SoTienDuong,
-  exit_venue: safeString.min(1),
+  exit_venue: z.enum(['sgx', 'nasdaq', 'nyse', 'hkex', 'hose']),
   target_year: z.number().int().min(2024).max(2100),
   industry: safeString.min(1),
   strategy: safeString.min(1),

@@ -11,7 +11,7 @@ const CreateSchema = z.object({
   round_id: safeUuid.optional().nullable(),
   investor_name: safeString.min(1),
   contact_email: safeEmail.optional(),
-  stage: safeString.optional(),
+  stage: z.enum(['outreach', 'intro', 'meeting', 'pitch', 'follow_up', 'term_sheet', 'due_diligence', 'signed', 'wired', 'closed', 'passed', 'ghosted']).optional(),
   target_check_usd: z.number().optional(),
   notes: safeString.optional(),
 })

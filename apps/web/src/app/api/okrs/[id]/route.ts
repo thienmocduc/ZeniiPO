@@ -10,7 +10,7 @@ const UpdateSchema = z.object({
   title: safeString.min(1).optional(),
   description: safeString.optional(),
   progress: z.number().min(0).max(100).optional(),
-  status: safeString.min(1).optional(),
+  status: z.enum(['active', 'completed', 'abandoned']).optional(),
 })
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

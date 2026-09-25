@@ -13,7 +13,7 @@ const CreateSchema = z.object({
   value: z.number(),
   unit: safeString.optional(),
   period: safeString.optional(),
-  trend: safeString.optional(),
+  trend: z.enum(['up', 'down', 'flat']).optional(),
 })
 
 export async function GET(req: Request) {

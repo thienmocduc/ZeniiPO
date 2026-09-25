@@ -8,8 +8,8 @@ export const runtime = 'nodejs'
 
 const UpdateSchema = z.object({
   title: safeString.min(1).optional(),
-  status: safeString.optional(),
-  priority: safeString.optional(),
+  status: z.enum(['todo', 'in_progress', 'blocked', 'done']).optional(),
+  priority: z.enum(['t1', 't2', 't3']).optional(),
   completed_at: safeString.optional().nullable(),
   due_date: safeString.optional().nullable(),
   assignee_id: safeUuid.optional().nullable(),

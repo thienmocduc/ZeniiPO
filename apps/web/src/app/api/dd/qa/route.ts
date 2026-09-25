@@ -16,7 +16,7 @@ const CreateSchema = z.object({
 const UpdateSchema = z.object({
   id: safeUuid,
   answer: safeString.min(1).optional(),
-  status: safeString.optional(),
+  status: z.enum(['open', 'answered', 'closed']).optional(),
 })
 
 export async function GET() {

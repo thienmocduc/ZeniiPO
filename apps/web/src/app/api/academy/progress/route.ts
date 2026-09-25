@@ -7,9 +7,9 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const MarkSchema = z.object({
-  content_type: safeString.min(1),
+  content_type: z.enum(['phase_content', 'training_drill']),
   content_id: safeUuid,
-  status: safeString.optional(),
+  status: z.enum(['not_started', 'in_progress', 'completed', 'mastered']).optional(),
   progress_pct: z.number().min(0).max(100).optional(),
 })
 

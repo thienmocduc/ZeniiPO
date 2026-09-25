@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const CreateSchema = z.object({
-  tier: safeString.min(1),
+  tier: z.enum(['chr', 'ceo', 'cfo', 'coo', 'cto', 'cmo', 'clo', 'emp']),
   title: safeString.min(1),
   description: safeString.optional(),
   parent_id: safeUuid.optional().nullable(),

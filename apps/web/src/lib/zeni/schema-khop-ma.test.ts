@@ -301,13 +301,18 @@ describe('Mã phải khớp lược đồ CSDL', () => {
       const ma = fs.readFileSync(tep, 'utf8');
       // CHỈ lấy bảng route này GHI vào, không lấy bảng nó chỉ đọc.
       //
+      // ⚠ Cho phép DÒNG CHÚ THÍCH xen giữa `.from()` và `.insert()`. Bản trước
+      // chỉ cho khoảng trắng, nên trượt hẳn `okrs/route.ts` — nơi có một chú
+      // thích nằm giữa hai lời gọi. Ba test 4/5/6 cùng dùng phép thu hẹp này
+      // nên cùng mù một chỗ.
+      //
       // Bản đầu lấy mọi `.from('...')` và báo nhầm ngay: `org/route.ts` ghi
       // `status` xuống `org_positions` nhưng có ĐỌC `ipo_journeys` ở chỗ khác,
       // nên test ghép nhầm hai thứ rồi tố một lỗi không tồn tại. Test báo
       // nhầm thì người ta sẽ tắt nó đi — thà soi hẹp mà đúng.
       const cacBang = [
         ...new Set(
-          [...ma.matchAll(/\.from\('(\w+)'\)\s*\n?\s*\.(?:insert|upsert|update)\(/g)].map((m) => m[1]),
+          [...ma.matchAll(/\.from\('(\w+)'\)(?:\s|\/\/[^\n]*)*\.(?:insert|upsert|update)\(/g)].map((m) => m[1]),
         ),
       ];
       if (cacBang.length === 0) continue;
@@ -357,6 +362,54 @@ describe('Mã phải khớp lược đồ CSDL', () => {
     expect(
       hong,
       `\n${hong.length} chỗ tập giá trị trong mã LỆCH với ràng buộc CSDL:\n  ` +
+        hong.join('\n  ') +
+        '\n',
+    ).toEqual([]);
+  });
+
+  it('6. cột có RÀNG BUỘC DANH SÁCH thì cửa vào phải là z.enum, không phải chuỗi tự do', () => {
+    // ⚠ LỚP LỖI THỨ BẢY, đo ngày 26/09/2026: 14 trường nhận `safeString` /
+    // `z.string()` rồi ghi thẳng vào cột mà CSDL chỉ cho vài giá trị. Gõ
+    // "Series A" thay vì "series_a", hay "CHR" thay vì "chr", là nhận lỗi 500
+    // khó hiểu từ ràng buộc — thay vì một câu báo lỗi nói rõ chọn gì.
+    //
+    // Sáu trong số đó nằm đúng trên chuỗi phân tầng mục tiêu:
+    // okr_objectives.tier/status, okr_krs.metric_type/status,
+    // tasks.status/priority.
+    //
+    // Test 5 chỉ soi `z.enum` xem có khớp CSDL không, nên KHÔNG bắt được
+    // trường hợp không dùng enum ngay từ đầu. Đây là mặt còn lại của nó.
+    const chophep = giaTriChoPhep();
+    expect(chophep.size, 'không đọc được ràng buộc CHECK nào ⇒ test này vô nghĩa').toBeGreaterThan(5);
+
+    const hong: string[] = [];
+    for (const tep of moiNoiGhi()) {
+      const ma = fs.readFileSync(tep, 'utf8');
+      // CHỈ bảng route này GHI vào — cùng cách thu hẹp như test 5.
+      const cacBang = [
+        ...new Set(
+          [...ma.matchAll(/\.from\('(\w+)'\)(?:\s|\/\/[^\n]*)*\.(?:insert|upsert|update)\(/g)].map((m) => m[1]),
+        ),
+      ];
+      if (cacBang.length === 0) continue;
+
+      for (const m of ma.matchAll(/^\s*(\w+):\s*(safeString|z\.string\(\))/gm)) {
+        const [, cot, kieu] = m;
+        for (const b of cacBang) {
+          const tap = chophep.get(`${b}.${cot}`);
+          if (!tap) continue;
+          const ten = path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/');
+          hong.push(
+            `${ten} · ${b}.${cot} nhận ${kieu} nhưng CSDL chỉ cho ${tap.size} giá trị ` +
+              `(${[...tap].slice(0, 4).join(', ')}${tap.size > 4 ? '…' : ''}) ⇒ gõ sai là lỗi 500`,
+          );
+        }
+      }
+    }
+
+    expect(
+      hong,
+      `\n${hong.length} trường chuỗi tự do ghi vào cột có ràng buộc:\n  ` +
         hong.join('\n  ') +
         '\n',
     ).toEqual([]);

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const InviteSchema = z.object({
-  role: safeString.min(1), // lawyer | auditor | accountant | advisor | etc
+  role: z.enum(['lawyer', 'auditor', 'underwriter', 'investor', 'board_member', 'advisor', 'banker', 'consultant']),
   name: safeString.min(1),
   email: safeEmail,
   organization: safeString.optional(),

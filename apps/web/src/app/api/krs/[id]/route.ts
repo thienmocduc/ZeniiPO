@@ -10,7 +10,7 @@ const UpdateSchema = z.object({
   title: safeString.min(1).optional(),
   actual_value: z.number().optional(),
   target_value: z.number().optional(),
-  status: safeString.min(1).optional(),
+  status: z.enum(['on_track', 'amber', 'red', 'done']).optional(),
 })
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
