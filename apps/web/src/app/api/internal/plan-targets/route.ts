@@ -19,6 +19,23 @@ export const runtime = 'nodejs'
  * GET only. Sai key → 401. POST/PUT/... → 405.
  */
 
+/**
+ * Ngày của kỳ về đúng 'YYYY-MM-DD'.
+ *
+ * Cột `date` của Postgres bị trình điều khiển dựng thành `Date`, rồi JSON hoá
+ * thành dấu thời gian UTC ('2026-10-01T00:00:00.000Z'). Bên nhận ở múi giờ âm
+ * cắt 10 ký tự đầu là lùi mất một ngày — lệch cả một kỳ kế hoạch.
+ */
+function ngayKy(v: unknown): string {
+  if (v instanceof Date) {
+    const y = v.getUTCFullYear()
+    const m = String(v.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(v.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  return String(v ?? '').slice(0, 10)
+}
+
 function safeEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a)
   const bb = Buffer.from(b)
@@ -120,6 +137,19 @@ export async function GET(req: Request) {
     const coa = r.coa_line ? loaiTheoMa.get(r.coa_line) : undefined
     return {
       ...r,
+      // ── amount phải là SỐ, không phải chuỗi ──
+      // Cột `amount` là bigint, và trình điều khiển Postgres trả int8 dạng
+      // CHUỖI để khỏi mất chữ số. Gửi nguyên chuỗi đi thì bên ZeniOS làm
+      // `tong += row.amount` ra NỐI CHUỖI chứ không phải cộng — một con số
+      // sai mà không có lỗi nào. Chuỗi trông giống số là dạng nguy hiểm nhất.
+      //
+      // An toàn vì `SoTien` chặn ở 1e15, thấp hơn hẳn mốc 2^53 mà JSON/JS còn
+      // giữ nguyên vẹn số nguyên.
+      amount: r.amount === null || r.amount === undefined ? null : Number(r.amount),
+      // ── period phải là 'YYYY-MM-DD', không phải dấu thời gian có Z ──
+      // Cột `date` bị trả về thành dấu thời gian UTC. Bên nhận ở múi giờ âm
+      // cắt 10 ký tự đầu sẽ lùi mất một ngày, tức lệch cả một kỳ kế hoạch.
+      period: ngayKy(r.period),
       statement: coa?.statement ?? null,
       label_vi: coa?.label_vi ?? null,
       /** true = số dư cuối kỳ, CẤM cộng dồn nhiều tháng. */
