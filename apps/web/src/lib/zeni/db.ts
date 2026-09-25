@@ -9,6 +9,8 @@ import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 declare global {
   // eslint-disable-next-line no-var
   var __zeniIpoPool: Pool | undefined;
+  // Pool vai CHỦ, tách riêng — xem `getOwnerPool()`.
+  var __zeniIpoOwnerPool: Pool | undefined;
 }
 
 export function hasDatabase(): boolean {
@@ -34,8 +36,8 @@ export function chuoiKetNoiMigration(): string | undefined {
   return process.env.DATABASE_URL_MIGRATION ?? process.env.DATABASE_URL;
 }
 
-function makePool(): Pool {
-  const connectionString = process.env.DATABASE_URL;
+function makePool(connectionString?: string): Pool {
+  connectionString = connectionString ?? process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error('Thiếu DATABASE_URL — chờ platform gắn Cloud SQL (ticket #8).');
   }
@@ -56,6 +58,43 @@ function makePool(): Pool {
 export function getPool(): Pool {
   if (!global.__zeniIpoPool) global.__zeniIpoPool = makePool();
   return global.__zeniIpoPool;
+}
+
+/**
+ * Pool VAI CHỦ — dành riêng cho các đường máy-gọi-máy đã tự xác thực.
+ *
+ * ⚠ POOL NÀY BỎ QUA RLS HOÀN TOÀN. Chỉ dùng ở nơi đã tự kiểm danh tính bằng
+ * cách khác (cron + CRON_SECRET, ingest + token băm, internal + x-internal-key,
+ * console sau khi `is_chairman_super`). Đưa đầu vào người dùng chưa kiểm soát
+ * vào đây là lộ dữ liệu chéo doanh nghiệp.
+ *
+ * ── VÌ SAO PHẢI TÁCH RIÊNG ──
+ * `createServiceClient()` tự mô tả là "chạy dưới user owner → không bị RLS
+ * chặn", nhưng nó gọi `getPool()` — và `DATABASE_URL` từ khi siết bảo mật đã
+ * trỏ về `zeniipo_com_runtime`, một vai KHÔNG sở hữu bảng. Nên RLS vẫn áp, và
+ * mọi đường máy-gọi-máy đều MÙ: đo trên production, vai runtime không có phiên
+ * nhìn thấy 0 tenant, 0 user_profiles, 0 plan_targets trong khi vai chủ thấy
+ * 1 / 1 / 466.
+ *
+ * Hệ quả im lặng: hợp đồng ba tầng gửi ZeniOS/ZeniERP luôn trả rỗng, và cả bốn
+ * tác vụ định kỳ "chạy thành công" với 0 bản ghi xử lý. Không có lỗi nào được
+ * ném ra — đó là kiểu hỏng khó phát hiện nhất.
+ *
+ * Thiếu `DATABASE_URL_MIGRATION` thì NÉM LỖI chứ không lặng lẽ rơi về vai
+ * runtime: chạy tiếp mà không thấy gì còn tệ hơn là dừng lại và báo.
+ */
+export function getOwnerPool(): Pool {
+  if (!global.__zeniIpoOwnerPool) {
+    const cs = process.env.DATABASE_URL_MIGRATION;
+    if (!cs) {
+      throw new Error(
+        'Thiếu DATABASE_URL_MIGRATION — đường máy-gọi-máy cần vai chủ để bỏ qua RLS. ' +
+          'Chạy bằng vai runtime thì mọi truy vấn trả rỗng mà không báo lỗi.',
+      );
+    }
+    global.__zeniIpoOwnerPool = makePool(cs);
+  }
+  return global.__zeniIpoOwnerPool;
 }
 
 /** Query không ngữ cảnh người dùng (catalog/health/setup). */
