@@ -31,6 +31,7 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { trangCoHamVaThat } from '@/components/v1-data-bind';
 
 type Props = { script: string };
 
@@ -129,8 +130,33 @@ function transformScript(raw: string): string {
     'try { $1 } catch(e) {}',
   );
 
+  // 9) VÔ HIỆU HOÁ ba hàm dựng minh hoạ, vì `setRole()` gọi THẲNG chúng.
+  //
+  // Chặn ở tầng React không đủ: `setRole` (dòng ~5985 của source.html) gọi
+  // `renderOKRPage(role)` bằng chính binding cục bộ trong script, không qua
+  // `window`. Nên mỗi lần người dùng đổi vai trên thanh trên, dữ liệu minh hoạ
+  // CỨNG (`OKR_TREE`, `TASKS_BY_ROLE`) dựng lại DOM và ghi đè dữ liệu thật mà
+  // hàm vá vừa nạp. Việc này vừa thành rủi ro cụ thể: chuỗi phân rã (migration
+  // 046/047) nay sinh OKR thật cho từng vai và `/okr` là nơi nó phải hiện ra.
+  //
+  // ⚠ KHÔNG gọt thân hàm bằng regex — đã có bài học: regex gỡ nút SSO từng xoá
+  // luôn nút Đăng nhập. Ở đây chỉ GÁN LẠI tên hàm ở cuối script. Khai báo hàm
+  // trong phạm vi `new Function` là binding gán lại được, nên `setRole` sẽ gọi
+  // vào hàm rỗng mà không cần sửa một ký tự nào trong thân hàm gốc.
+  //
+  // `renderDashboard` CỐ Ý GIỮ NGUYÊN: `page-dash` không có hàm vá thật nào, gỡ
+  // nó đi là làm trắng bảng điều khiển.
+  s +=
+    '\n\n/* vô hiệu hoá hàm dựng minh hoạ trên trang đã có hàm vá thật */\n' +
+    'try { renderOKRPage = function(){}; window.renderOKRPage = renderOKRPage; } catch(e) {}\n' +
+    'try { renderTasksPage = function(){}; window.renderTasksPage = renderTasksPage; } catch(e) {}\n' +
+    'try { filterAgentsPage = function(){}; window.filterAgentsPage = filterAgentsPage; } catch(e) {}\n';
+
   return s;
 }
+
+/** Lộ hàm biến đổi ra để test canh được — nó là chỗ dễ vỡ nhất của tệp này. */
+export const _chiDungChoTest = { transformScript };
 
 export function V1Interactivity({ script }: Props) {
   const pathname = usePathname();
@@ -171,13 +197,33 @@ export function V1Interactivity({ script }: Props) {
       refreshKnowledgePanelDefaults?: () => void;
     };
     const role = w.currentRole || 'chr';
-    // Re-render whatever exists for this page (try/catch each — pages may not
-    // contain the relevant DOM nodes).
+
+    /**
+     * ⚠ KHÔNG chạy hàm dựng minh hoạ trên trang đã có hàm vá dữ liệu THẬT.
+     *
+     * `renderOKRPage` / `renderTasksPage` / `filterAgentsPage` trong `source.html`
+     * DỰNG LẠI cả cấu trúc DOM từ dữ liệu minh hoạ CỨNG (`OKR_TREE`,
+     * `TASKS_BY_ROLE`). Hàm vá thật nạp dữ liệu KHÔNG ĐỒNG BỘ nên thường về sau
+     * và thắng — nhưng đó là thắng do may về thời điểm, không do thiết kế. Mỗi
+     * lần hiệu ứng chạy lại (đổi trang rồi quay lại, đổi vai) là một lần dữ liệu
+     * minh hoạ có thể ghi đè dữ liệu thật.
+     *
+     * Chuyện này vừa thành rủi ro cụ thể: chuỗi phân rã mục tiêu (migration
+     * 046/047) nay sinh OKR thật cho từng vai, và `/okr` là nơi nó phải hiện ra.
+     * Để `OKR_TREE` cứng ghi đè lên đó thì chủ tịch xem thấy cây của công ty mẫu.
+     *
+     * Danh sách trang lấy từ chính nơi khai hàm vá (`trangCoHamVaThat`), không gõ
+     * lại — gõ lại là để hai danh sách lệch nhau về sau.
+     */
+    const coHamVaThat = new Set(trangCoHamVaThat());
+    const boQua = (pageId: string) => coHamVaThat.has(`page-${pageId}`);
+
     [
-      () => w.renderDashboard?.(role),
-      () => w.renderOKRPage?.(role),
-      () => w.renderTasksPage?.(role),
-      () => w.filterAgentsPage?.(role),
+      // `page-dash` KHÔNG có hàm vá thật, nên vẫn cần hàm dựng này.
+      () => (boQua('dash') ? undefined : w.renderDashboard?.(role)),
+      () => (boQua('okr') ? undefined : w.renderOKRPage?.(role)),
+      () => (boQua('tasks') ? undefined : w.renderTasksPage?.(role)),
+      () => (boQua('agents') ? undefined : w.filterAgentsPage?.(role)),
       () => w.applyNavFilter?.(role),
       () => w.injectKnowledgePanels?.(),
       () => w.refreshKnowledgePanelDefaults?.(),

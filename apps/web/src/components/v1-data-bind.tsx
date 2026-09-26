@@ -347,6 +347,14 @@ const stClass = (s: string) => STATUS_CLASS[String(s).toLowerCase()] ?? 'dim'
 // Patchers — Phase 1 core (existing 9)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Trang có hàm vá dữ liệu THẬT. `v1-interactivity` đọc danh sách này để KHÔNG
+ * chạy hàm dựng minh hoạ trên những trang đó — xem chú thích ở đó để biết vì sao.
+ */
+export function trangCoHamVaThat(): string[] {
+  return Object.keys(PAGE_PATCHERS)
+}
+
 const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
   'page-dash': async (raw) => {
     const root = document.getElementById('page-dash')
