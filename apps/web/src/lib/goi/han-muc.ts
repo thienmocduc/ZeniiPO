@@ -12,7 +12,16 @@ import type { ZeniClient } from '@/lib/zeni/compat'
  * trả đồng nào cũng không bị chặn gì.
  */
 
-export type ViecCanQuyen = 'tao_hanh_trinh' | 'them_ghe' | 'hoc_vien' | 'thao_truong'
+export type ViecCanQuyen =
+  | 'tao_hanh_trinh'
+  | 'them_ghe'
+  | 'hoc_vien'
+  | 'thao_truong'
+  // Mỗi lần tra nguồn gọi lớp render của ZeniCloud và tốn credit thật
+  // (`web_automation_render`). Khai sẵn ở đây để chủ tịch đặt hạn mức được ngay
+  // mà không phải sửa mã. Chưa khai hạn mức trong `membership_tiers` thì
+  // `duoc_dung()` cho qua — đúng thiết kế, xem chú thích bên dưới.
+  | 'nghien_cuu_thi_truong'
 
 export type KetQuaQuyen =
   | { ok: true; goi: string }

@@ -861,6 +861,65 @@ const PAGE_PATCHERS: Record<string, (raw: Json) => void | Promise<void>> = {
     const refresh = async () => { const r = await apiSend('/api/masterplan', 'GET'); if (r.ok) render(r.data as Mp) }
     render(((raw as { data?: Mp })?.data) ?? {})
 
+    // ── CỔNG KHẢ THI ──
+    // Trang này hứa nguyên văn "reverse-engineer ra công thức ràng buộc mọi
+    // metric", nhưng trước migration 050 không có một phép thử nào phía sau:
+    // chủ tịch nhập định giá đích thì hệ thống ghi xuống rồi cả nền tảng chạy
+    // theo. Khối dưới đây hiện đúng một sự thật số học — mục tiêu đòi gấp bao
+    // nhiêu lần chính nhịp mà bản kế hoạch đã chốt cam kết.
+    type KhaThi = {
+      ket_luan: string
+      giai_thich: string
+      thieu?: string[]
+      canh_bao?: string | null
+      ke_hoach?: { cagr_ke_hoach_pct?: number; nam_ket_thuc?: number; so_nam_khong_co_ke_hoach?: number }
+      giai_nguoc?: { cagr_can_pct?: number; gap_bao_nhieu_lan_ke_hoach?: number; boi_so_ev_doanh_thu?: number; nguon_ty_gia?: string }
+    }
+    void (async () => {
+      const r = await apiSend('/api/kha-thi', 'GET')
+      if (!r.ok) return
+      const k = ((r.data as { data?: KhaThi })?.data ?? r.data) as KhaThi
+      if (!k?.ket_luan) return
+
+      let o = root.querySelector<HTMLElement>('#za-kha-thi')
+      if (!o) {
+        o = document.createElement('div')
+        o.id = 'za-kha-thi'
+        o.setAttribute('data-testid', 'cong-kha-thi')
+        const kpiRow = root.querySelector('.kpi-row')
+        if (kpiRow?.parentNode) kpiRow.parentNode.insertBefore(o, kpiRow.nextSibling)
+        else root.appendChild(o)
+      }
+      const mau =
+        k.ket_luan === 'vuot_ke_hoach' ? '#f0b429'
+        : k.ket_luan === 'khop_ke_hoach' ? '#4ade80'
+        : 'var(--dim)'
+      const nhan =
+        k.ket_luan === 'vuot_ke_hoach' ? 'MỤC TIÊU VƯỢT QUÁ KẾ HOẠCH'
+        : k.ket_luan === 'khop_ke_hoach' ? 'KẾ HOẠCH ĐẠT TỚI MỤC TIÊU'
+        : 'CHƯA ĐO ĐƯỢC'
+      const g = k.giai_nguoc ?? {}
+      const chiTiet =
+        g.cagr_can_pct != null
+          ? `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:.72rem">
+               <span>Nhịp cần: <b style="color:${mau}">${g.cagr_can_pct}%/năm</b></span>
+               <span>Nhịp kế hoạch cam kết: <b>${k.ke_hoach?.cagr_ke_hoach_pct ?? '—'}%/năm</b></span>
+               <span>Gấp <b style="color:${mau}">${g.gap_bao_nhieu_lan_ke_hoach ?? '—'}</b> lần</span>
+               <span style="color:var(--dim)">bội số ngành ${g.boi_so_ev_doanh_thu ?? '—'}× · tỷ giá: ${escapeHtml(g.nguon_ty_gia ?? '—')}</span>
+             </div>`
+          : ''
+      const thieu = (k.thieu ?? []).length
+        ? `<ul style="margin:8px 0 0 16px;font-size:.7rem;color:var(--dim)">${(k.thieu ?? []).map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+        : ''
+      o.style.cssText = `margin:14px 0;padding:14px;border:1px solid ${mau}55;border-radius:12px;background:${mau}0d`
+      o.innerHTML =
+        `<div style="font-size:.62rem;letter-spacing:.14em;color:${mau}">${nhan}</div>` +
+        `<div style="margin-top:6px;font-size:.82rem;line-height:1.5">${escapeHtml(k.giai_thich)}</div>` +
+        chiTiet +
+        thieu +
+        (k.canh_bao ? `<div style="margin-top:8px;font-size:.72rem;color:#f0b429">${escapeHtml(k.canh_bao)}</div>` : '')
+    })()
+
     let panel = root.querySelector<HTMLElement>('#mp-review')
     if (!panel) {
       panel = document.createElement('div')
