@@ -193,3 +193,41 @@ export async function duongTaiVe(
     return { ok: false, loi: `Không gọi được lớp lưu trữ: ${(e as Error).message}` }
   }
 }
+
+/**
+ * ĐƯỜNG DỰ PHÒNG: lấy thẳng byte qua lớp lưu trữ, không cần đường có chữ ký.
+ *
+ * ⚠ VÌ SAO CẦN. Đo trên production 26/09/2026: `POST .../signed-url` trả 500
+ *     "Failed to generate signed URL: Project was not passed and could not be
+ *      determined from the environment."
+ * Tải LÊN chạy tốt, chỉ ký đường tải về là hỏng — lỗi phía nền tảng, không phải
+ * phía ứng dụng. Nhưng tệp tải lên mà không tải về được thì tính năng vô dụng.
+ *
+ * Đây KHÔNG phải đổi nền tảng: vẫn đúng lớp lưu trữ ZeniCloud, chỉ dùng endpoint
+ * proxy (`GET .../objects/{key}`) mà chính tài liệu của nó nêu là đường hợp lệ
+ * ("for high-traffic use signed-url instead"). Đổi lại là byte đi qua ứng dụng,
+ * nên phải để lộ ra rằng đang chạy đường dự phòng — che đi thì lỗi nền tảng
+ * không bao giờ được sửa.
+ */
+export async function taiByteZeniCloud(
+  cau: CauHinh,
+  storagePath: string,
+): Promise<{ ok: true; byte: Buffer } | { ok: false; loi: string }> {
+  const m = /^zenicloud:\/\/([^/]+)\/(.+)$/.exec(storagePath)
+  if (!m) return { ok: false, loi: `Đường dẫn không thuộc lớp lưu trữ ZeniCloud: ${storagePath}` }
+  const [, bucket, key] = m
+  try {
+    const res = await fetch(
+      `${cau.api}/storage/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(key)}` +
+        `?ws=${encodeURIComponent(cau.ws)}`,
+      { headers: { Authorization: `Bearer ${cau.token}` }, cache: 'no-store' },
+    )
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      return { ok: false, loi: `Lớp lưu trữ trả ${res.status}: ${t.slice(0, 200)}` }
+    }
+    return { ok: true, byte: Buffer.from(await res.arrayBuffer()) }
+  } catch (e) {
+    return { ok: false, loi: `Không lấy được byte: ${(e as Error).message}` }
+  }
+}

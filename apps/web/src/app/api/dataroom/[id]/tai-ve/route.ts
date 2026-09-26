@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { requireUserAndTenant } from '@/lib/api/tenant'
-import { cauHinhLuuTru, duongTaiVe } from '@/lib/luu-tru/ho-so'
+import { cauHinhLuuTru, duongTaiVe, taiByteZeniCloud } from '@/lib/luu-tru/ho-so'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -26,6 +26,16 @@ export const runtime = 'nodejs'
  * Tải lên đã chặn HTML và SVG, nhưng ba tiêu đề này là lớp phòng thứ hai: hồ sơ
  * cũ nạp từ nơi khác vào vẫn có thể là loại nguy hiểm.
  */
+
+/**
+ * Gột tên tệp cho tiêu đề HTTP.
+ *
+ * Tên gốc do người ngoài đặt: nó chứa được dấu ngoặc kép và ký tự điều khiển làm
+ * vỡ tiêu đề `Content-Disposition`, và vỡ tiêu đề là một đường tiêm.
+ */
+function tenTepAnToan(d: { ten_tep_goc: string | null; title: string }): string {
+  return (d.ten_tep_goc ?? d.title ?? 'ho-so').replace(/[^\w.\-]+/g, '_').slice(0, 120)
+}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -70,8 +80,33 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       )
     }
     const r = await duongTaiVe(cau, duong)
-    if (!r.ok) return NextResponse.json({ error: r.loi }, { status: 502 })
-    return NextResponse.json({ data: { url: r.url, het_han_sau_giay: 300, sha256: d.sha256 } })
+    if (r.ok) {
+      return NextResponse.json({ data: { url: r.url, het_han_sau_giay: 300, sha256: d.sha256 } })
+    }
+
+    // Ký đường tải về hỏng phía nền tảng (đo 26/09: "Project was not passed and
+    // could not be determined from the environment"). Lấy byte qua endpoint proxy
+    // của CÙNG lớp lưu trữ, để tệp tải lên vẫn tải về được.
+    // ⚠ Không che: header `X-Zeni-Luu-Tru` nói rõ đang chạy đường dự phòng, nếu
+    // không thì lỗi nền tảng biến mất khỏi tầm nhìn và không bao giờ được sửa.
+    const byte = await taiByteZeniCloud(cau, duong)
+    if (!byte.ok) {
+      return NextResponse.json(
+        { error: `Không ký được đường tải về (${r.loi}) và cũng không lấy được byte (${byte.loi})` },
+        { status: 502 },
+      )
+    }
+    return new NextResponse(new Uint8Array(byte.byte), {
+      status: 200,
+      headers: {
+        'Content-Type': d.mime_type ?? 'application/octet-stream',
+        'Content-Length': String(byte.byte.length),
+        'Content-Disposition': `attachment; filename="${tenTepAnToan(d)}"`,
+        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': 'private, no-store',
+        'X-Zeni-Luu-Tru': 'proxy-du-phong; ky-duong-dan-loi',
+      },
+    })
   }
 
   if (duong.startsWith('csdl://blob/')) {
@@ -95,9 +130,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         ? Buffer.from(raw.replace(/^\\x/, ''), 'hex')
         : Buffer.from(raw as Uint8Array)
 
-    // Tên tệp trong tiêu đề phải được gột: tên gốc do người ngoài đặt, chứa được
-    // dấu ngoặc kép và ký tự điều khiển làm vỡ tiêu đề HTTP.
-    const ten = (d.ten_tep_goc ?? d.title ?? 'ho-so').replace(/[^\w.\-]+/g, '_').slice(0, 120)
+    const ten = tenTepAnToan(d)
 
     return new NextResponse(new Uint8Array(byte), {
       status: 200,

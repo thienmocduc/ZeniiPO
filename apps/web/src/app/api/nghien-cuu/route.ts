@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { requireUserAndTenant } from '@/lib/api/tenant'
+import { createServiceClient } from '@/lib/supabase/service'
+import { isCurrentSuperAdmin } from '@/lib/zeni/superadmin'
 import { kiemQuyen } from '@/lib/goi/han-muc'
 import { chatComplete, isAIConfigured, DEFAULT_MODEL } from '@/lib/agents/client'
 import {
@@ -43,10 +45,20 @@ export const maxDuration = 300
 
 const Body = z.object({
   urls: z.array(z.string().max(2048)).min(1).max(5),
-  loai: z.enum(['thi_truong', 'so_sanh_niem_yet']),
+  loai: z.enum(['thi_truong', 'so_sanh_niem_yet', 'ty_gia']),
   /** Chỉ dùng cho `thi_truong`, để xếp số liệu vào đúng ngành. */
   industry_code: z.string().max(20).optional(),
 })
+
+type DongTyGia = {
+  base_ccy: string
+  quote_ccy: string
+  rate: number
+  rate_type?: string
+  ten_ngan_hang: string
+  ngay_cong_bo?: string
+  trich_dan: string
+}
 
 type DongSoSanh = {
   company_name: string
@@ -96,6 +108,22 @@ export async function POST(req: Request) {
     )
   }
 
+  // ⚠ TỶ GIÁ LÀ DỮ LIỆU TOÀN NỀN TẢNG, KHÔNG THUỘC MỘT DOANH NGHIỆP.
+  // `fx_rates` không có cột `tenant_id`, và đã kiểm bằng đúng vai trên
+  // production: vai `authenticated` bị RLS chặn khi ghi ("new row violates
+  // row-level security policy"), chỉ vai chủ ghi được. Nên chế độ này là việc
+  // của chủ tịch nền tảng, và phải ghi qua service client.
+  if (parsed.data.loai === 'ty_gia' && !(await isCurrentSuperAdmin())) {
+    return NextResponse.json(
+      {
+        error:
+          'Chỉ chủ tịch nền tảng mới nạp được tỷ giá. Tỷ giá dùng chung cho mọi doanh nghiệp — ' +
+          'để một khách tự đặt thì mọi mô hình tài chính trên nền tảng đổi theo.',
+      },
+      { status: 403 },
+    )
+  }
+
   const ketQua: Array<Record<string, unknown>> = []
   let tongNhan = 0
   let tongLoai = 0
@@ -115,7 +143,11 @@ export async function POST(req: Request) {
     const vanBan = trang.text.slice(0, CAT)
 
     const nhacThem =
-      parsed.data.loai === 'so_sanh_niem_yet'
+      parsed.data.loai === 'ty_gia'
+        ? `\n\nLần này trích TỶ GIÁ ngân hàng công bố. Mỗi dòng:
+[{"base_ccy":"USD","quote_ccy":"VND","rate":0,"rate_type":"spot|closing|average","ten_ngan_hang":"...","ngay_cong_bo":"YYYY-MM-DD","trich_dan":"..."}]
+Quy ước: 1 base_ccy = rate quote_ccy. "ten_ngan_hang" phải là tên ngân hàng ghi TRONG trang, không suy ra từ tên miền. Không có tên ngân hàng thì bỏ dòng đó.`
+        : parsed.data.loai === 'so_sanh_niem_yet'
         ? `\n\nLần này trích CÔNG TY NIÊM YẾT để so sánh. Mỗi dòng:
 [{"company_name":"...","ticker":"...","exchange":"...","revenue_usd":0,"enterprise_value_usd":0,"market_cap_usd":0,"trich_dan":"...","confidence":0.0-1.0}]
 Chỉ ghi con số nào văn bản nêu rõ. Không suy ra, không quy đổi đơn vị, không ước lượng.`
@@ -148,6 +180,67 @@ Chỉ ghi con số nào văn bản nêu rõ. Không suy ra, không quy đổi đ
     }
     if (!Array.isArray(dong)) {
       ketQua.push({ url: an.url, ok: false, loi: 'Mô hình không trả mảng' })
+      continue
+    }
+
+    if (parsed.data.loai === 'ty_gia') {
+      const ds = dong as DongTyGia[]
+      // Xác minh bằng chính bộ dùng chung: gắn `value_numeric` = tỷ giá.
+      const kiem = xacMinhTrichDan(
+        trang.text,
+        ds.map((x) => ({
+          metric_type: `${x.base_ccy}/${x.quote_ccy}`,
+          value_numeric: Number(x.rate),
+          value_unit: x.quote_ccy ?? '',
+          trich_dan: x.trich_dan ?? '',
+        })),
+      )
+      const nhanCap = new Set(kiem.nhan.map((x) => x.metric_type))
+      // Chú thích của `fx_rates` yêu cầu source là "tên ngân hàng + ngày công bố".
+      // Dòng không có tên ngân hàng thì KHÔNG đạt chuẩn của chính bảng đó.
+      const nhan = ds.filter(
+        (x) => nhanCap.has(`${x.base_ccy}/${x.quote_ccy}`) && String(x.ten_ngan_hang ?? '').trim().length >= 2,
+      )
+      tongNhan += nhan.length
+      tongLoai += ds.length - nhan.length
+
+      if (nhan.length > 0) {
+        const sb = createServiceClient()
+        const { error } = await sb.from('fx_rates').upsert(
+          nhan.map((x) => ({
+            base_ccy: String(x.base_ccy).toUpperCase().slice(0, 3),
+            quote_ccy: String(x.quote_ccy).toUpperCase().slice(0, 3),
+            rate: Number(x.rate),
+            effective_from: x.ngay_cong_bo ?? new Date().toISOString().slice(0, 10),
+            rate_type: ['spot', 'closing', 'average'].includes(String(x.rate_type))
+              ? String(x.rate_type)
+              : 'spot',
+            source: `${String(x.ten_ngan_hang).slice(0, 80)} · công bố ${x.ngay_cong_bo ?? 'không ghi ngày'}`,
+            note: `Trích tự động, đoạn dẫn đã xác minh: "${String(x.trich_dan).slice(0, 240)}" · nguồn: ${an.url}`,
+          })),
+          { onConflict: 'base_ccy,quote_ccy,effective_from,rate_type' },
+        )
+        if (error) {
+          ketQua.push({ url: an.url, ok: false, loi: `Không ghi được tỷ giá: ${error.message}` })
+          continue
+        }
+      }
+      ketQua.push({
+        url: an.url,
+        ok: true,
+        tieu_de: trang.title,
+        so_nhan: nhan.length,
+        so_loai: ds.length - nhan.length,
+        bi_loai: [
+          ...kiem.loai.map((x) => ({ cap: x.dong.metric_type, ly_do: x.ly_do })),
+          ...ds
+            .filter((x) => String(x.ten_ngan_hang ?? '').trim().length < 2)
+            .map((x) => ({
+              cap: `${x.base_ccy}/${x.quote_ccy}`,
+              ly_do: 'Không nêu được tên ngân hàng — bảng fx_rates yêu cầu nguồn là tên ngân hàng kèm ngày công bố',
+            })),
+        ],
+      })
       continue
     }
 
