@@ -260,7 +260,73 @@ for (let i = 0; i < 24; i++) {
   if (/success|fail|error/i.test(status)) break
 }
 
+/**
+ * Nạp biến môi trường qua ĐÚNG endpoint của nó.
+ *
+ * ⚠ `env_vars` trong `/deploy/quick` KHÔNG tới được container đang chạy. Đo
+ * 26/09/2026: log deploy ghi "5 env vars" (đúng bốn biến lưu trữ + NODE_ENV),
+ * thùng chứa "zeniipo-ho-so" đã có, mã mới đã chạy (`/api/kha-thi` trả 200) —
+ * nhưng ứng dụng vẫn báo `lop_luu_tru: "chua_nap_khoa"` nên mọi tệp tải lên rơi
+ * vào lớp giữ tạm trong CSDL. Chính chú thích cũ trong tệp này đã ghi nhận điều
+ * đó cho `SUPABASE_SERVICE_ROLE_KEY`/`DATABASE_URL` ("go via env UI only") mà
+ * chưa ai rút ra kết luận chung.
+ *
+ * Đường đúng: `POST /projects/{id}/env` kèm `ap_dung_ngay` để dịch vụ chạy lại.
+ * Gọi SAU khi đã tung ra, để lần chạy lại áp lên đúng bản mới.
+ */
+async function napBienMoiTruong() {
+  const bien = {
+    ZENICLOUD_API: API,
+    ZENICLOUD_WS: WS,
+    ZENICLOUD_STORAGE_TOKEN: TOK,
+    ZENICLOUD_STORAGE_BUCKET: STORAGE_BUCKET,
+    // Cổng AI đi cùng đường này, không đi qua `env_vars` của /deploy/quick —
+    // cùng lý do: biến gửi kèm deploy không tới được container đang chạy.
+    AI_BASE_URL: pick('AI_BASE_URL'),
+    AI_API_KEY: pick('AI_API_KEY'),
+    AI_MODEL_DEEP: pick('AI_MODEL_DEEP'),
+    AI_MODEL_FAST: pick('AI_MODEL_FAST'),
+  }
+  // Biến rỗng thì BỎ HẲN, đừng gửi chuỗi rỗng: gửi rỗng sẽ GHI ĐÈ giá trị đang
+  // có trên dịch vụ bằng rỗng, tức là vô hiệu hoá đúng thứ đang chạy tốt.
+  for (const k of Object.keys(bien)) if (!bien[k]) delete bien[k]
+  if (Object.keys(bien).length === 0) {
+    console.warn('⚠ không có biến nào để nạp.')
+    return
+  }
+  try {
+    const ds = await fetch(`${API}/projects?ws=${encodeURIComponent(WS)}`, { headers: hdr, cache: 'no-store' })
+    if (!ds.ok) {
+      console.warn(`⚠ không liệt kê được dự án (${ds.status}) — chưa nạp được biến lưu trữ.`)
+      return
+    }
+    const j = await ds.json().catch(() => null)
+    const mang = Array.isArray(j) ? j : (j?.items ?? j?.data ?? [])
+    const du = mang.find((x) => x?.name === payload.name || x?.slug === payload.name)
+    if (!du?.id) {
+      console.warn(`⚠ không tìm thấy dự án "${payload.name}" — chưa nạp được biến lưu trữ.`)
+      return
+    }
+    const r = await fetch(`${API}/projects/${du.id}/env?ws=${encodeURIComponent(WS)}`, {
+      method: 'POST',
+      headers: hdr,
+      body: JSON.stringify({ env: bien, ap_dung_ngay: true }),
+    })
+    if (r.ok) console.log(`◇ đã nạp ${Object.keys(bien).length} biến lưu trữ vào dự án và cho chạy lại`)
+    else {
+      const t = await r.text().catch(() => '')
+      // KHÔNG đổi mã thoát: bản deploy đã tung ra thành công. Thiếu biến lưu trữ
+      // chỉ khiến tệp nằm tạm trong CSDL, và ứng dụng nói rõ điều đó.
+      console.warn(`⚠ nạp biến thất bại (${r.status}): ${t.slice(0, 200)}`)
+      console.warn('  → hồ sơ tải lên sẽ giữ tạm trong CSDL, hạn mức 8 MB.')
+    }
+  } catch (e) {
+    console.warn(`⚠ không nạp được biến lưu trữ: ${e.message}`)
+  }
+}
+
 if (/success/i.test(status)) {
+  await napBienMoiTruong()
   console.log('\n✅ ĐÃ TUNG RA. Kiểm: https://zeniipo.com/login')
   process.exit(0)
 }

@@ -86,6 +86,13 @@ jobs:
           ZENICLOUD_API: ${{ secrets.ZENICLOUD_API }}
           ZENICLOUD_WS: ${{ secrets.ZENICLOUD_WS }}
           ZENICLOUD_API_TOKEN: ${{ secrets.ZENICLOUD_API_TOKEN }}
+          # Cổng AI (gateway WitsAGI) — cần cho lớp tra nguồn thị trường và các
+          # agent. Không có bốn biến này thì /api/nghien-cuu trả 503 và nói rõ là
+          # thiếu điều kiện hạ tầng, chứ không âm thầm trả dữ liệu rỗng.
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL_DEEP: ${{ secrets.AI_MODEL_DEEP }}
+          AI_MODEL_FAST: ${{ secrets.AI_MODEL_FAST }}
           # Trên CI, mã đã ở đúng commit của GitHub rồi nên bỏ qua cổng chặn git.
           ZENI_DEPLOY_SKIP_GIT_CHECK: '1'
         run: node scripts/deploy-zenicloud.mjs

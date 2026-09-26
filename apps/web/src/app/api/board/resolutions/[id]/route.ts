@@ -96,7 +96,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     )
   }
 
-  const parsed = SuaSchema.safeParse(await req.json().catch(() => ({})))
+  const tho = (await req.json().catch(() => ({}))) as Record<string, unknown>
+
+  // Nói RÕ vì sao bốn trường này bị từ chối, thay vì để zod lặng lẽ gỡ chúng rồi
+  // trả "không có trường nào để sửa". Thông báo mơ hồ khiến người sau tưởng cửa
+  // vào bị hỏng và "sửa" nó bằng cách thêm lại chúng vào lược đồ — tức là mở lại
+  // đúng cửa sau vừa bịt.
+  const camGhi = ['status', 'votes_for', 'votes_against', 'votes_abstain'].filter((k) => k in tho)
+  if (camGhi.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `Không sửa trực tiếp được: ${camGhi.join(', ')}. ` +
+          'Trạng thái và số phiếu là kết quả DẪN RA, không phải giá trị gõ vào — ' +
+          'gọi PATCH /api/board/resolutions với hanh_dong "bo_phieu" rồi "chot". ' +
+          'Ở đó túc số được tính từ điểm danh thật và nghị quyết thiếu túc số bị từ chối.',
+        di_dau: { bo_phieu: 'PATCH /api/board/resolutions', chot: 'PATCH /api/board/resolutions' },
+      },
+      { status: 422 },
+    )
+  }
+
+  const parsed = SuaSchema.safeParse(tho)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   if (Object.keys(parsed.data).length === 0) {
     return NextResponse.json({ error: 'Không có trường nào để sửa' }, { status: 400 })
