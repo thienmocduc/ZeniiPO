@@ -56,6 +56,8 @@ export function BangSanSang({ journeyId }: { journeyId: string }) {
   const [diem, setDiem] = useState<Diem | null>(null)
   const [dangTai, setDangTai] = useState(true)
   const [ban, setBan] = useState<string | null>(null)
+  /** Mã tiêu chí đang tải tệp — tách khỏi `dangTai` của lần tải trang đầu. */
+  const [dangTaiTep, setDangTaiTep] = useState<string | null>(null)
   const [loi, setLoi] = useState<string | null>(null)
 
   const tai = useCallback(async () => {
@@ -197,6 +199,55 @@ export function BangSanSang({ journeyId }: { journeyId: string }) {
                         <option key={h.id} value={h.id} className="bg-bg-2">{h.title}</option>
                       ))}
                     </select>
+                    {/* Tải hồ sơ NGAY TẠI DÒNG rồi đính luôn.
+                        Trước đây ô chọn trên chỉ liệt kê hồ sơ có sẵn, mà không
+                        route nào ghi vào `data_room_docs` — nên danh sách luôn
+                        rỗng và tiêu chí không bao giờ đính được bằng chứng. Hệ quả:
+                        điểm ĐÃ XÁC MINH không bao giờ vượt được 0. */}
+                    <label
+                      className="text-2xs rounded border border-w8 px-1.5 py-0.5 text-ink-dim cursor-pointer"
+                      title="Tải hồ sơ lên và đính vào tiêu chí này"
+                    >
+                      {dangTaiTep === c.id ? 'đang tải…' : '+ tải hồ sơ'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.csv,.txt"
+                        disabled={dangTaiTep === c.id}
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          setDangTaiTep(c.id)
+                          try {
+                            const fd = new FormData()
+                            fd.append('file', f)
+                            fd.append('title', `${c.name_vi} — ${f.name}`)
+                            fd.append('category', `san-sang:${c.category}`)
+                            const res = await fetch('/api/dataroom/upload', {
+                              method: 'POST',
+                              credentials: 'same-origin',
+                              body: fd,
+                            })
+                            const j = await res.json()
+                            if (!res.ok) throw new Error(j?.error ?? 'Tải hồ sơ thất bại')
+                            await sua(c.id, { evidence_file_id: j.data.id as string })
+                          } catch (er) {
+                            setLoi(er instanceof Error ? er.message : 'Lỗi không rõ')
+                          } finally {
+                            setDangTaiTep(null)
+                            e.target.value = ''
+                          }
+                        }}
+                      />
+                    </label>
+                    {c.evidence_file_id && (
+                      <a
+                        href={`/api/dataroom/${c.evidence_file_id}/tai-ve`}
+                        className="text-2xs text-gold-light underline"
+                      >
+                        tải về
+                      </a>
+                    )}
                     {!c.evidence_file_id && (
                       <span className="text-2xs text-ink-dim italic">không hồ sơ ⇒ tính 0 điểm khi thẩm định</span>
                     )}

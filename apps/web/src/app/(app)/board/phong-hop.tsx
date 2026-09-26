@@ -126,7 +126,19 @@ const TT_GIAO: Record<string, string> = {
 const coCanCu = (v: unknown) =>
   v != null && typeof v === 'object' && Object.keys(v as object).length > 0
 
-type Tab = 'thanh-vien' | 'uy-ban' | 'ky-hop' | 'nghi-quyet' | 'so-giao'
+type BienBan = {
+  id: string
+  meeting_id: string
+  version: number
+  body_md: string | null
+  doc_id: string | null
+  content_hash: string | null
+  nguon: string
+  ai_model: string | null
+  approved_at: string | null
+}
+
+type Tab = 'thanh-vien' | 'uy-ban' | 'ky-hop' | 'bien-ban' | 'nghi-quyet' | 'so-giao'
 
 export function PhongHopHoiDong() {
   const [tab, setTab] = useState<Tab>('thanh-vien')
@@ -137,6 +149,10 @@ export function PhongHopHoiDong() {
   const [tucSo, setTucSo] = useState<Record<string, TucSo>>({})
   const [nq, setNq] = useState<NghiQuyet[]>([])
   const [giao, setGiao] = useState<BanGiao[]>([])
+  const [bienBan, setBienBan] = useState<BienBan[]>([])
+  const [lopLuuTru, setLopLuuTru] = useState<string | null>(null)
+  const [fBb, setFBb] = useState({ meeting_id: '', body_md: '' })
+  const [dangTaiTep, setDangTaiTep] = useState(false)
   const [dangTai, setDangTai] = useState(true)
   const [ban, setBan] = useState(false)
   const [loi, setLoi] = useState<string | null>(null)
@@ -163,21 +179,27 @@ export function PhongHopHoiDong() {
 
   const tai = useCallback(async () => {
     try {
-      const [rTv, rUb, rKh, rNq, rGiao] = await Promise.all([
+      const [rTv, rUb, rKh, rNq, rGiao, rBb, rHs] = await Promise.all([
         fetch('/api/board/members', { credentials: 'same-origin' }),
         fetch('/api/board/committees', { credentials: 'same-origin' }),
         fetch('/api/board/meetings', { credentials: 'same-origin' }),
         fetch('/api/board/resolutions', { credentials: 'same-origin' }),
         fetch('/api/board/distribution', { credentials: 'same-origin' }),
+        fetch('/api/board/minutes', { credentials: 'same-origin' }),
+        fetch('/api/dataroom/upload', { credentials: 'same-origin' }),
       ])
-      const [jTv, jUb, jKh, jNq, jGiao] = await Promise.all([
+      const [jTv, jUb, jKh, jNq, jGiao, jBb, jHs] = await Promise.all([
         rTv.json(),
         rUb.json(),
         rKh.json(),
         rNq.json(),
         rGiao.json(),
+        rBb.json(),
+        rHs.json(),
       ])
       if (!rTv.ok) throw new Error(jTv?.error ?? 'Không tải được thành viên')
+      setBienBan((jBb.data ?? []) as BienBan[])
+      setLopLuuTru((jHs.lop_luu_tru ?? null) as string | null)
       setTv((jTv.data ?? []) as ThanhVien[])
       setThongKe((jTv.thong_ke ?? null) as ThongKeTV | null)
       setUyBan((jUb.data ?? []) as UyBan[])
@@ -273,6 +295,7 @@ export function PhongHopHoiDong() {
             ['thanh-vien', 'Thành viên'],
             ['uy-ban', 'Uỷ ban'],
             ['ky-hop', 'Kỳ họp'],
+            ['bien-ban', 'Biên bản'],
             ['nghi-quyet', 'Nghị quyết'],
             ['so-giao', 'Sổ phân phối'],
           ] as Array<[Tab, string]>
@@ -603,6 +626,175 @@ export function PhongHopHoiDong() {
             >
               Mở phiên họp
             </button>
+          </details>
+        </section>
+      )}
+
+      {/* ══ BIÊN BẢN ══ */}
+      {tab === 'bien-ban' && (
+        <section className="space-y-3">
+          {lopLuuTru === 'chua_nap_khoa' && (
+            <p className="text-xs text-amber-400 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+              Lớp lưu trữ ZeniCloud chưa được nạp khoá nên bản quét đang giữ tạm trong cơ sở dữ
+              liệu — hạn mức 8 MB mỗi tệp. Tính năng dùng bình thường, sẽ chuyển sang lớp lưu trữ
+              khi khoá sẵn sàng.
+            </p>
+          )}
+
+          {bienBan.length === 0 && (
+            <p className="text-sm text-ink-dim">
+              Chưa có biên bản nào. Biên bản là hồ sơ bên thẩm định hỏi đầu tiên ở mảng quản trị —
+              thiếu biên bản thì không chứng minh được nghị quyết đã được thông qua hợp lệ.
+            </p>
+          )}
+          {bienBan.map((b) => {
+            const ky = kyHop.find((k) => k.id === b.meeting_id)
+            return (
+              <div key={b.id} className="rounded border border-white/10 p-3">
+                <div className="flex justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="text-gold-light">
+                      {ky ? `${ky.meeting_no} · ${ky.title}` : b.meeting_id} — bản {b.version}
+                    </div>
+                    <div className="text-xs text-ink-dim">
+                      {b.nguon === 'ai_de_xuat' ? `Bản nháp AI (${b.ai_model})` : 'Người soạn'}
+                      {b.content_hash && ` · băm ${b.content_hash.slice(0, 12)}…`}
+                      {b.doc_id ? ' · có bản quét đã ký' : ' · CHƯA có bản quét đã ký'}
+                      {b.approved_at
+                        ? ` · đã duyệt ${new Date(b.approved_at).toLocaleDateString('vi-VN')}`
+                        : ' · chưa duyệt'}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    {b.doc_id && (
+                      <a
+                        href={`/api/dataroom/${b.doc_id}/tai-ve`}
+                        className="px-3 py-1.5 text-sm rounded border border-white/15 text-ink-dim"
+                      >
+                        Tải bản ký
+                      </a>
+                    )}
+                    {!b.approved_at && (
+                      <>
+                        <label className="px-3 py-1.5 text-sm rounded border border-white/15 text-ink-dim cursor-pointer">
+                          {dangTaiTep ? 'Đang tải…' : 'Tải bản ký lên'}
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.png,.jpg,.jpeg,.webp"
+                            disabled={dangTaiTep}
+                            onChange={async (e) => {
+                              const f = e.target.files?.[0]
+                              if (!f) return
+                              setDangTaiTep(true)
+                              setLoi(null)
+                              try {
+                                const fd = new FormData()
+                                fd.append('file', f)
+                                fd.append('title', `Biên bản ${ky?.meeting_no ?? ''} bản ${b.version}`)
+                                fd.append('category', 'bien-ban-hdqt')
+                                const res = await fetch('/api/dataroom/upload', {
+                                  method: 'POST',
+                                  credentials: 'same-origin',
+                                  body: fd,
+                                })
+                                const j = await res.json()
+                                if (!res.ok) throw new Error(j?.error ?? 'Tải tệp thất bại')
+                                // Gắn tệp vào biên bản bằng cách tạo bản kế tiếp:
+                                // biên bản không ghi đè, phiên bản chỉ tăng.
+                                const g = await fetch('/api/board/minutes', {
+                                  method: 'POST',
+                                  headers: { 'content-type': 'application/json' },
+                                  credentials: 'same-origin',
+                                  body: JSON.stringify({
+                                    meeting_id: b.meeting_id,
+                                    body_md: b.body_md ?? undefined,
+                                    doc_id: j.data.id,
+                                  }),
+                                })
+                                const jg = await g.json()
+                                if (!g.ok) throw new Error(jg?.error ?? 'Không gắn được tệp')
+                                setTin(
+                                  `Đã tải bản ký (${(j.data.file_size_bytes / 1024).toFixed(0)} KB, băm ${String(j.data.sha256).slice(0, 12)}…) và tạo bản ${jg.data.version}`,
+                                )
+                                await tai()
+                              } catch (er) {
+                                setLoi(er instanceof Error ? er.message : 'Lỗi không rõ')
+                              } finally {
+                                setDangTaiTep(false)
+                                e.target.value = ''
+                              }
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={ban}
+                          onClick={() => void goi('/api/board/minutes', { id: b.id }, 'PATCH')}
+                          className="px-3 py-1.5 text-sm rounded border border-gold-light/40 text-gold-light disabled:opacity-40"
+                          title="Người soạn không tự duyệt được — cần người thứ hai"
+                        >
+                          Duyệt biên bản
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
+          <details className="rounded border border-white/10 p-3">
+            <summary className="text-sm text-gold-light cursor-pointer">Soạn biên bản mới</summary>
+            {kyHop.length === 0 ? (
+              <p className="text-sm text-ink-dim mt-2">Phải mở phiên họp trước.</p>
+            ) : (
+              <>
+                <label className="text-sm block mt-3">
+                  <span className="block text-ink-dim mb-1">Phiên họp</span>
+                  <select
+                    value={fBb.meeting_id}
+                    onChange={(e) => setFBb({ ...fBb, meeting_id: e.target.value })}
+                    className="w-full bg-black/30 border border-white/15 rounded px-2 py-1.5"
+                  >
+                    <option value="">— chọn phiên họp —</option>
+                    {kyHop.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.meeting_no} · {k.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm block mt-3">
+                  <span className="block text-ink-dim mb-1">Nội dung biên bản</span>
+                  <textarea
+                    rows={8}
+                    value={fBb.body_md}
+                    onChange={(e) => setFBb({ ...fBb, body_md: e.target.value })}
+                    placeholder="Thành phần dự họp, nội dung thảo luận, kết luận từng mục trong chương trình…"
+                    className="w-full bg-black/30 border border-white/15 rounded px-2 py-1.5 font-mono text-xs"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={ban || !fBb.meeting_id || fBb.body_md.trim().length < 10}
+                  onClick={async () => {
+                    const ok = await goi('/api/board/minutes', {
+                      meeting_id: fBb.meeting_id,
+                      body_md: fBb.body_md.trim(),
+                    })
+                    if (ok) setFBb({ meeting_id: '', body_md: '' })
+                  }}
+                  className="mt-3 px-3 py-1.5 text-sm rounded bg-gold-light/20 border border-gold-light/40 text-gold-light disabled:opacity-40"
+                >
+                  Lưu biên bản
+                </button>
+                <p className="text-xs text-ink-dim mt-2">
+                  Nội dung được băm SHA-256 khi lưu. Bản quét có chữ ký tải lên sau sẽ tạo bản kế
+                  tiếp — biên bản không ghi đè, phiên bản chỉ tăng.
+                </p>
+              </>
+            )}
           </details>
         </section>
       )}

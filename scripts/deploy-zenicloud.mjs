@@ -41,6 +41,8 @@ const pick = (k) => process.env[k]
 // chairman explicitly authorized shipping for build-test (2026-06-22, "cài tạm
 // để dùng build test, xong dự án sẽ cài key mới đúng luật"). Rotate later.
 // SUPABASE_SERVICE_ROLE_KEY / DATABASE_URL still go via env UI only.
+const STORAGE_BUCKET = process.env.ZENICLOUD_STORAGE_BUCKET ?? 'zeniipo-ho-so'
+
 const env_vars = {
   NODE_ENV: 'production',
   NEXT_PUBLIC_SUPABASE_URL: pick('NEXT_PUBLIC_SUPABASE_URL'),
@@ -49,8 +51,73 @@ const env_vars = {
   AI_API_KEY: pick('AI_API_KEY'),
   AI_MODEL_DEEP: pick('AI_MODEL_DEEP'),
   AI_MODEL_FAST: pick('AI_MODEL_FAST'),
+  // ── Lớp lưu trữ (Lớp 02) — cần cho đường tải hồ sơ lên ──
+  // Không có bốn biến này thì `/api/dataroom/upload` giữ tạm byte trong CSDL:
+  // tính năng vẫn chạy nhưng hạn mức thấp hơn và tệp nằm sai chỗ. Dùng chính
+  // PAT đã dùng để deploy — cùng workspace, cùng quyền.
+  ZENICLOUD_API: API,
+  ZENICLOUD_WS: WS,
+  ZENICLOUD_STORAGE_TOKEN: TOK,
+  ZENICLOUD_STORAGE_BUCKET: STORAGE_BUCKET,
 }
 for (const k of Object.keys(env_vars)) if (!env_vars[k]) delete env_vars[k]
+
+/**
+ * Tạo sẵn thùng chứa hồ sơ nếu chưa có.
+ *
+ * Làm ở đây chứ không làm bằng tay: hạ tầng phải dựng được lại từ mã. Một bước
+ * thủ công trong quy trình deploy là một bước sẽ bị quên khi dựng lại môi trường.
+ *
+ * Danh sách loại tệp cho phép khai ngay ở thùng — trùng với danh sách trong
+ * `lib/luu-tru/ho-so.ts`. Chặn hai lớp: HTML và SVG chạy mã khi người khác mở
+ * hồ sơ, nên không được nhận ở cả tầng ứng dụng lẫn tầng lưu trữ.
+ */
+async function baoDamThungChua() {
+  const q = `ws=${encodeURIComponent(WS)}`
+  try {
+    const ds = await fetch(`${API}/storage/buckets?${q}`, { headers: hdr, cache: 'no-store' })
+    if (ds.ok) {
+      const j = await ds.json().catch(() => null)
+      const ten = (Array.isArray(j) ? j : (j?.items ?? j?.data ?? [])).map((b) => b?.name ?? b)
+      if (ten.includes(STORAGE_BUCKET)) {
+        console.log(`◇ thùng chứa "${STORAGE_BUCKET}" đã có`)
+        return
+      }
+    } else {
+      console.warn(`⚠ không liệt kê được thùng chứa (${ds.status}) — thử tạo luôn`)
+    }
+    const tao = await fetch(`${API}/storage/buckets?${q}`, {
+      method: 'POST',
+      headers: hdr,
+      body: JSON.stringify({
+        name: STORAGE_BUCKET,
+        visibility: 'private',
+        max_file_size_mb: 25,
+        allowed_mime_types: [
+          'application/pdf',
+          'image/png',
+          'image/jpeg',
+          'image/webp',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'text/csv',
+          'text/plain',
+        ],
+      }),
+    })
+    if (tao.ok) console.log(`◇ đã tạo thùng chứa "${STORAGE_BUCKET}"`)
+    else {
+      const t = await tao.text().catch(() => '')
+      // KHÔNG dừng deploy: thiếu thùng chứa thì ứng dụng giữ tạm tệp trong CSDL
+      // và nói rõ điều đó. Chặn cả bản deploy vì một tính năng phụ là đánh đổi sai.
+      console.warn(`⚠ chưa tạo được thùng chứa (${tao.status}): ${t.slice(0, 200)}`)
+      console.warn('  → hồ sơ tải lên sẽ giữ tạm trong CSDL, hạn mức 8 MB.')
+    }
+  } catch (e) {
+    console.warn(`⚠ không gọi được lớp lưu trữ: ${e.message}`)
+  }
+}
 
 /**
  * Tự đóng gói mã nguồn trước khi gửi.
@@ -154,6 +221,10 @@ const payload = {
   allow_unauthenticated: true,
   env_vars,
 }
+
+// Thùng chứa phải có TRƯỚC khi bản mới nhận biến môi trường lưu trữ, nếu không
+// lần tải tệp đầu tiên sau deploy sẽ lỗi 502 thay vì chạy.
+await baoDamThungChua()
 
 console.log('→ POST /deploy/quick (repo_url build, ' + Object.keys(env_vars).length + ' env vars)')
 const res = await fetch(`${API}/deploy/quick?ws=${WS}`, { method: 'POST', headers: hdr, body: JSON.stringify(payload) })
