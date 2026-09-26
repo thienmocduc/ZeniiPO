@@ -1763,24 +1763,70 @@ ${d.setup_hint ?? ''}`,
   'page-board': (raw) => {
     const root = document.getElementById('page-board')
     if (!root) return
-    const list = ((raw as { data?: Array<{ id: string; full_name?: string; email: string; role: string; created_at: string }> })?.data) ?? []
-    const founders = list.filter((m) => /chr|ceo|founder/i.test(m.role)).length
-    const investors = list.filter((m) => /investor/i.test(m.role)).length
-    const indep = list.filter((m) => /board/i.test(m.role)).length
+    // ⚠ Bản trước suy hội đồng từ `user_profiles.role` bằng regex
+    // `/investor/i` và `/board/i`. Hai vai đó KHÔNG tồn tại trong ràng buộc
+    // CHECK, nên số nhà đầu tư và số thành viên độc lập LUÔN bằng 0 — con số
+    // trông như đã đo mà chưa bao giờ đo được gì. Nay đọc `board_members` thật
+    // qua `/api/board`, và số độc lập lấy từ `dem_thanh_vien_doc_lap()` (chỉ
+    // tính người có căn cứ độc lập).
+    const goc = raw as {
+      data?: Array<{ full_name?: string; title_vi?: string | null; member_type: string; is_chairman?: boolean }>
+      tong_hop?: {
+        doc_lap_co_can_cu?: number
+        khai_doc_lap?: number
+        hop_trong_nam?: number
+        nghi_quyet_trong_nam?: number
+        ky_hop_sap_toi?: string | null
+      }
+    }
+    const list = goc?.data ?? []
+    const th = goc?.tong_hop ?? {}
+    const dieuHanh = list.filter((m) => m.member_type === 'dieu_hanh').length
+    const khongDieuHanh = list.filter((m) => m.member_type === 'khong_dieu_hanh').length
+    const docLapCoCanCu = th.doc_lap_co_can_cu ?? 0
+    const thieuCanCu = (th.khai_doc_lap ?? 0) - docLapCoCanCu
     patchKpiCards(root, [
-      { value: String(list.length), label: 'Board members', sub: `${founders} founder · ${investors} investor · ${indep} indep` },
-      { value: '0', label: 'Meetings YTD' },
-      { value: '0', label: 'Resolutions YTD' },
-      { value: '—', label: 'Next meeting' },
+      {
+        value: String(list.length),
+        label: 'Thành viên hội đồng',
+        sub:
+          `${dieuHanh} điều hành · ${khongDieuHanh} không điều hành · ${docLapCoCanCu} độc lập` +
+          (thieuCanCu > 0 ? ` (${thieuCanCu} khai độc lập nhưng chưa có căn cứ)` : ''),
+      },
+      { value: String(th.hop_trong_nam ?? 0), label: 'Phiên họp trong năm' },
+      { value: String(th.nghi_quyet_trong_nam ?? 0), label: 'Nghị quyết trong năm' },
+      {
+        value: th.ky_hop_sap_toi ? new Date(th.ky_hop_sap_toi).toLocaleDateString('vi-VN') : '—',
+        label: 'Phiên họp sắp tới',
+      },
     ])
     const cards = root.querySelectorAll<HTMLElement>('.col-2 .card')
     if (cards[0]) {
       const tbody = cards[0].querySelector<HTMLTableSectionElement>('table.tbl tbody')
       if (tbody) {
         if (list.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:18px;font-style:italic">Chưa có board member.</td></tr>`
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:18px;font-style:italic">Chưa khai thành viên hội đồng nào. Không có thành viên thì không tính được túc số, và không phiên họp nào ra được nghị quyết có hiệu lực.</td></tr>`
         } else {
-          tbody.innerHTML = list.map((m) => `<tr><td><strong>${escapeHtml(m.full_name ?? m.email)}</strong><br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(m.role)}</span></td><td>${escapeHtml(m.role)}</td><td><span class="gold">Class A</span></td><td class="num">—</td></tr>`).join('')
+          // Cột "Voting" của mockup ghi cứng "Class A" cho mọi người. `board_members`
+          // chưa có khái niệm hạng cổ phần biểu quyết, nên để "—": thà trống còn
+          // hơn gán cho mọi thành viên một hạng mà chưa ai khai.
+          const LOAI: Record<string, string> = {
+            dieu_hanh: 'Điều hành',
+            khong_dieu_hanh: 'Không điều hành',
+            doc_lap: 'Độc lập',
+          }
+          tbody.innerHTML = list
+            .map(
+              (m) =>
+                `<tr><td><strong>${escapeHtml(m.full_name ?? '—')}</strong>${
+                  m.is_chairman ? ' <span class="gold">· Chủ tịch</span>' : ''
+                }${
+                  m.title_vi
+                    ? `<br/><span class="mono" style="font-size:.6rem;color:var(--dim)">${escapeHtml(m.title_vi)}</span>`
+                    : ''
+                }</td><td>${escapeHtml(LOAI[m.member_type] ?? m.member_type)}</td><td class="num">—</td><td class="num">—</td></tr>`,
+            )
+            .join('')
         }
       }
     }

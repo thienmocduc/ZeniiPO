@@ -3,12 +3,16 @@ import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/api/tenant'
 import { safeString, safeUuid } from '@/lib/security/schemas'
+import { MA_VAI } from '@/lib/zeni/vai'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const CreateSchema = z.object({
-  tier: z.enum(['chr', 'ceo', 'cfo', 'coo', 'cto', 'cmo', 'clo', 'emp']),
+  // Danh sách vai khai ở `lib/zeni/vai.ts`. Bản cũ gõ tay 8 giá trị nên sau khi
+  // migration 046/047 nới thêm cro·cpo·chro·ciso·gov thì cửa vào này từ chối
+  // đúng những vai CSDL đã cho phép.
+  tier: z.enum(MA_VAI),
   title: safeString.min(1),
   description: safeString.optional(),
   parent_id: safeUuid.optional().nullable(),

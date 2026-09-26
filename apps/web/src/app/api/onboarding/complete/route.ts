@@ -55,7 +55,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Onboarding already complete (journey exists)' }, { status: 409 })
   }
 
-  // Step 1+3: cascade RPC creates journey + 4 CHR objectives + readiness criteria seed.
+  // Step 1+3: cascade RPC creates journey + 4 CHR objectives + readiness criteria
+  // seed, và từ migration 047 phân rã luôn xuống cây vai kèm Key Result.
   const cascade = await supabase.rpc('cascade_chairman_event', {
     p_tenant_id: auth.tenantId,
     p_valuation: p.valuation_target_usd,
@@ -69,12 +70,16 @@ export async function POST(req: Request) {
   }
   const journeyId = (cascade.data as { journey_id?: string } | null)?.journey_id
 
-  // Update journey name (cascade RPC uses default name).
-  if (journeyId && p.journey_name) {
-    await supabase
-      .from('ipo_journeys')
-      .update({ name: p.journey_name, north_star_metric: p.north_star_metric, industry: p.industry })
-      .eq('id', journeyId)
+  // Sao Bắc Đẩu và ngành phải được ghi DÙ KHÔNG đặt tên hành trình. Điều kiện cũ
+  // gộp cả ba vào `if (p.journey_name)`, nên khách bỏ trống tên là mất luôn Sao
+  // Bắc Đẩu — thứ mà toàn bộ phần đo lường phía sau dựa vào.
+  if (journeyId) {
+    const capNhat: Record<string, string> = {
+      north_star_metric: p.north_star_metric,
+      industry: p.industry,
+    }
+    if (p.journey_name) capNhat.name = p.journey_name
+    await supabase.from('ipo_journeys').update(capNhat).eq('id', journeyId)
   }
 
   // Step 2: 4 KPIs

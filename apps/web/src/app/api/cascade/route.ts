@@ -39,6 +39,11 @@ export async function POST(req: Request) {
   // RPC signature: cascade_chairman_event(p_tenant_id, p_valuation, p_venue,
   //   p_year, p_industry, p_strategy). p_venue must match
   //   ipo_journeys.exit_venue check (sgx | nasdaq | nyse | hkex | hose) — lowercase.
+  //
+  // Sao Bắc Đẩu KHÔNG nằm trong chữ ký này. Thêm tham số thứ 7 có giá trị mặc
+  // định sẽ tạo hàm nạp chồng và làm mọi lời gọi 6 tham số trở thành nhập nhằng,
+  // nên nó được ghi ở bước riêng ngay dưới. Trước đây `north_star` được nhận ở
+  // schema rồi bỏ đi lặng lẽ — chủ tịch nhập xong không thấy đâu cả.
   const { data, error } = await supabase.rpc('cascade_chairman_event', {
     p_tenant_id: tenantId,
     p_valuation: parsed.data.valuation,
@@ -54,6 +59,18 @@ export async function POST(req: Request) {
 
   // RPC may return a single row or an array — normalize either shape.
   const row = Array.isArray(data) ? data[0] : data
+
+  // Ghi Sao Bắc Đẩu vào hành trình vừa sinh. Không chặn phản hồi nếu lỗi: mục
+  // tiêu và cây phân rã đã được ghi xong rồi, hỏng ở đây không được xoá cả việc
+  // đã làm — nhưng phải BÁO ra, không nuốt im như bản cũ.
+  let canhBao: string | null = null
+  if (row?.journey_id && parsed.data.north_star) {
+    const { error: nsErr } = await supabase
+      .from('ipo_journeys')
+      .update({ north_star_metric: parsed.data.north_star })
+      .eq('id', row.journey_id)
+    if (nsErr) canhBao = `Chưa lưu được Sao Bắc Đẩu: ${nsErr.message}`
+  }
 
   // Slack notification (no-op if SLACK_WEBHOOK_URL missing).
   const { data: tenant } = await supabase
@@ -71,11 +88,20 @@ export async function POST(req: Request) {
     journey_id: row?.journey_id ?? null,
   })
 
+  // Số đếm lấy từ hàm CSDL, không viết cứng. Bản cũ luôn trả `objectives_count: 4`
+  // kể cả khi thực tế sinh ra 14 mục tiêu — hoặc khi sinh ra 0 vì lỗi.
   return NextResponse.json({
     data: {
       event_id: row?.event_id ?? null,
       journey_id: row?.journey_id ?? null,
-      objectives_count: 4,
+      objective_goc: row?.objective_goc ?? null,
+      muc_tieu_chu_tich: row?.muc_tieu_chu_tich ?? 0,
+      muc_tieu_phan_ra: row?.muc_tieu_phan_ra ?? 0,
+      key_result: row?.key_result ?? 0,
+      chi_tieu_co_chuan: row?.chi_tieu_co_chuan ?? 0,
+      chi_tieu_cho_nguoi_dat: row?.chi_tieu_cho_nguoi_dat ?? 0,
+      north_star: parsed.data.north_star ?? null,
+      canh_bao: canhBao,
     },
   })
 }

@@ -221,10 +221,36 @@ describe('Mã phải khớp lược đồ CSDL', () => {
       for (const z of ma.matchAll(/const\s+(\w+)\s*=\s*z\.object\(\{([\s\S]*?)\n\}\)/g)) {
         luocDo.set(z[1], khoaTangNgoai(z[2]));
       }
-      const khoaZod = new Set<string>();
-      for (const d of ma.matchAll(/(\w+)\.(?:safeParse|parse)\(/g)) {
-        for (const k of luocDo.get(d[1]) ?? []) khoaZod.add(k);
+      // Lược đồ dẫn xuất: `const SuaSchema = TaoSchema.partial().extend({ … })`.
+      // Bỏ qua dạng này thì tên nó không tra được, và chỗ ghi dùng nó lại rơi về
+      // "không phân tích được" — tức là im lặng không canh gì.
+      for (const z of ma.matchAll(
+        /const\s+(\w+)\s*=\s*(\w+)(?:\.partial\(\)|\.omit\([^)]*\)|\.pick\([^)]*\))*\.extend\(\{([\s\S]*?)\n\}\)/g,
+      )) {
+        luocDo.set(z[1], [...(luocDo.get(z[2]) ?? []), ...khoaTangNgoai(z[3])]);
       }
+
+      // ⚠ LỚP BÁO NHẦM THỨ BA (26/09/2026, phát hiện ở /api/board/committees):
+      // bản trước gộp khoá của MỌI lược đồ trong tệp vào một tập `khoaZod` rồi
+      // đối chiếu với MỌI bảng được ghi. Tệp có hai lược đồ và hai bảng đích thì
+      // nó ghép chéo: trường của `ThanhVienSchema` bị đem soi trên
+      // `board_committees`, và ngược lại — 11 lỗi bịa ra trong khi mã hoàn toàn
+      // đúng. Đây đúng là lớp lỗi đã vá cho test 5, nay lộ lại ở test 4.
+      //
+      // Cách buộc đúng: `const parsed = XSchema.safeParse(...)` gần nhất PHÍA
+      // TRÊN chỗ ghi mới là lược đồ của chỗ ghi đó.
+      const noiLuocDo: Array<{ vi_tri: number; bien: string; ten: string }> = [];
+      for (const d of ma.matchAll(/(?:const|let)\s+(\w+)\s*=\s*(?:await\s+)?(\w+)\.(?:safeParse|parse)\(/g)) {
+        noiLuocDo.push({ vi_tri: d.index ?? 0, bien: d[1], ten: d[2] });
+      }
+      /** Khoá của lược đồ gắn với biến `bien` tại vị trí `viTri` trong tệp. */
+      const khoaTaiCho = (bien: string, viTri: number): string[] | null => {
+        const gan = noiLuocDo
+          .filter((x) => x.bien === bien && x.vi_tri < viTri)
+          .sort((a, b) => b.vi_tri - a.vi_tri)[0];
+        if (!gan) return null;
+        return luocDo.get(gan.ten) ?? null;
+      };
 
       for (const m of ma.matchAll(
         /\.from\('(\w+)'\)\s*\n?\s*\.(insert|upsert|update)\(\s*\{([\s\S]*?)\n\s*\}/g,
@@ -239,7 +265,19 @@ describe('Mã phải khớp lược đồ CSDL', () => {
         // liệu, không phải tên cột. (Bản đầu của test này báo nhầm đúng kiểu
         // đó cho 3 route; test báo nhầm thì người ta sẽ bỏ qua nó.)
         const dung = new Set<string>(khoaTangNgoai(than));
-        if (/\.\.\.\s*parsed\.data/.test(than)) for (const k of khoaZod) dung.add(k);
+        const raiVao = /\.\.\.\s*(\w+)\.data/.exec(than);
+        if (raiVao) {
+          const khoa = khoaTaiCho(raiVao[1], m.index ?? 0);
+          if (khoa === null) {
+            hong.push(
+              `${path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/')} · ` +
+                `${tenBang}.${dongTu}({ ...${raiVao[1]}.data }) — KHÔNG truy được lược đồ nào, ` +
+                `bộ canh không soi được cột. Đặt \`const ${raiVao[1]} = XSchema.safeParse(...)\` trước chỗ ghi.`,
+            );
+          } else {
+            for (const k of khoa) dung.add(k);
+          }
+        }
 
         for (const c of dung) {
           if (!cots.has(c)) {
@@ -259,12 +297,20 @@ describe('Mã phải khớp lược đồ CSDL', () => {
       // không có trên bảng, nên nộp bằng chứng luôn trả lỗi 500 — mà test cũ
       // vẫn xanh vì không soi tới.
       for (const m of ma.matchAll(
-        /\.from\('(\w+)'\)\s*\n?\s*\.(insert|upsert|update)\(\s*parsed\.data\s*\)/g,
+        /\.from\('(\w+)'\)\s*\n?\s*\.(insert|upsert|update)\(\s*(\w+)\.data\s*\)/g,
       )) {
-        const [, tenBang, dongTu] = m;
+        const [, tenBang, dongTu, bien] = m;
         const cots = bang.get(tenBang);
         if (!cots) continue;
-        for (const c of khoaZod) {
+        const khoa = khoaTaiCho(bien, m.index ?? 0);
+        if (khoa === null) {
+          hong.push(
+            `${path.relative(path.join(process.cwd(), 'src'), tep).replace(/\\/g, '/')} · ` +
+              `${tenBang}.${dongTu}(${bien}.data) — KHÔNG truy được lược đồ nào, bộ canh không soi được cột.`,
+          );
+          continue;
+        }
+        for (const c of khoa) {
           if (!cots.has(c)) {
             const gan = [...cots].filter((x) => x.includes(c.split('_')[0])).slice(0, 2).join(', ');
             hong.push(
